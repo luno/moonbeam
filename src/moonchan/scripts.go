@@ -2,7 +2,9 @@ package channels
 
 import (
 	"bytes"
+	"errors"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -35,13 +37,13 @@ func fundingTxScript(senderPubKey, receiverPubKey *btcutil.AddressPubKey, timeou
 	return b.Script()
 }
 
-func (c *SharedState) GetFundingScript() ([]byte, string, error) {
-	script, err := fundingTxScript(c.SenderPubKey, c.ReceiverPubKey, c.Timeout)
+func (s *SharedState) GetFundingScript() ([]byte, string, error) {
+	script, err := fundingTxScript(s.SenderPubKey, s.ReceiverPubKey, s.Timeout)
 	if err != nil {
 		return nil, "", err
 	}
 
-	scriptHash, err := btcutil.NewAddressScriptHash(script, c.Net)
+	scriptHash, err := btcutil.NewAddressScriptHash(script, s.Net)
 	if err != nil {
 		return nil, "", err
 	}
@@ -49,10 +51,7 @@ func (c *SharedState) GetFundingScript() ([]byte, string, error) {
 	return script, scriptHash.String(), nil
 }
 
-func (s *SharedState) GetClosureTx() (*wire.MsgTx, error) {
-	receiveAmount := s.Balance
-	senderAmount := s.FundingAmount - s.Balance - s.Fee
-
+func (s *SharedState) spendFundingTx() (*wire.MsgTx, error) {
 	txid, err := chainhash.NewHashFromStr(s.FundingTxID)
 	if err != nil {
 		return nil, err
@@ -66,29 +65,43 @@ func (s *SharedState) GetClosureTx() (*wire.MsgTx, error) {
 
 	tx := wire.NewMsgTx(2)
 	tx.AddTxIn(&txin)
+	return tx, nil
+}
+
+func sendToAddress(amount int64, addr *btcutil.AddressPubKey) (*wire.TxOut, error) {
+	pkscript, err := txscript.PayToAddrScript(addr.AddressPubKeyHash())
+	if err != nil {
+		return nil, err
+	}
+	return &wire.TxOut{
+		Value:    amount,
+		PkScript: pkscript,
+	}, nil
+}
+
+func (s *SharedState) GetClosureTx() (*wire.MsgTx, error) {
+	receiveAmount := s.Balance
+	senderAmount := s.FundingAmount - s.Balance - s.Fee
+
+	tx, err := s.spendFundingTx()
+	if err != nil {
+		return nil, err
+	}
 
 	if receiveAmount > 0 {
-		pkscript1, err := txscript.PayToAddrScript(s.ReceiverPubKey.AddressPubKeyHash())
+		txout, err := sendToAddress(receiveAmount, s.ReceiverPubKey)
 		if err != nil {
 			return nil, err
 		}
-		txout1 := wire.TxOut{
-			Value:    receiveAmount,
-			PkScript: pkscript1,
-		}
-		tx.AddTxOut(&txout1)
+		tx.AddTxOut(txout)
 	}
 
 	if senderAmount > 0 {
-		pkscript2, err := txscript.PayToAddrScript(s.SenderPubKey.AddressPubKeyHash())
+		txout, err := sendToAddress(senderAmount, s.SenderPubKey)
 		if err != nil {
 			return nil, err
 		}
-		txout2 := wire.TxOut{
-			Value:    senderAmount,
-			PkScript: pkscript2,
-		}
-		tx.AddTxOut(&txout2)
+		tx.AddTxOut(txout)
 	}
 
 	return tx, nil
@@ -124,4 +137,81 @@ func (s *SharedState) GetClosureTxSigned(senderSig, receiverSig []byte) ([]byte,
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (s *SharedState) GetRefundTxSigned(privKey *btcec.PrivateKey) ([]byte, error) {
+	tx, err := s.spendFundingTx()
+	if err != nil {
+		return nil, err
+	}
+
+	amount := s.FundingAmount - s.Fee
+	txout, err := sendToAddress(amount, s.SenderPubKey)
+	if err != nil {
+		return nil, err
+	}
+	tx.AddTxOut(txout)
+
+	tx.TxIn[0].Sequence = uint32(s.Timeout)
+
+	script, _, err := s.GetFundingScript()
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := txscript.RawTxInSignature(
+		tx, 0, script, txscript.SigHashAll, privKey)
+	if err != nil {
+		return nil, err
+	}
+
+	b := txscript.NewScriptBuilder()
+	b.AddData(sig)
+	b.AddData(s.SenderPubKey.ScriptAddress())
+	b.AddOp(txscript.OP_FALSE)
+	b.AddData(script)
+	finalScript, err := b.Script()
+	if err != nil {
+		return nil, err
+	}
+
+	tx.TxIn[0].SignatureScript = finalScript
+
+	var buf bytes.Buffer
+	if err := tx.Serialize(&buf); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (s *SharedState) validateTx(rawTx []byte) error {
+	script, err := fundingTxScript(s.SenderPubKey, s.ReceiverPubKey, s.Timeout)
+	if err != nil {
+		return err
+	}
+	addr, err := btcutil.NewAddressScriptHash(script, s.Net)
+	if err != nil {
+		return err
+	}
+	pkscript, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return err
+	}
+
+	var tx wire.MsgTx
+	if err := tx.BtcDecode(bytes.NewReader(rawTx), 2); err != nil {
+		return err
+	}
+
+	if len(tx.TxIn) != 1 {
+		return errors.New("wrong number of inputs")
+	}
+
+	engine, err := txscript.NewEngine(pkscript, &tx, 0, 0, nil)
+	if err != nil {
+		return err
+	}
+
+	return engine.Execute()
 }

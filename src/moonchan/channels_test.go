@@ -8,7 +8,7 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
-func TestFlow(t *testing.T) {
+func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 	net := &chaincfg.TestNet3Params
 
 	const senderPrivKeyWIF = "cRTgZtoTP8ueH4w7nob5reYTKpFLHvDV9UfUfa67f3SMCaZkGB6L"
@@ -21,6 +21,12 @@ func TestFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	return net, senderWIF, receiverWIF
+}
+
+func TestFlow(t *testing.T) {
+	net, senderWIF, receiverWIF := setUp(t)
 
 	s, err := OpenChannel(net, senderWIF.PrivKey)
 	if err != nil {
@@ -41,8 +47,8 @@ func TestFlow(t *testing.T) {
 	t.Errorf("funding address: %s", addr)
 
 	const (
-		txid   = "be5760e87218c5d613d113b43c2d3760f1edb4a5ca6b35899f33215afa0a7ce4"
-		vout   = 0
+		txid   = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout   = 1
 		amount = 1000000
 		height = 100
 	)
@@ -60,6 +66,52 @@ func TestFlow(t *testing.T) {
 	}
 	t.Errorf("closeTx: %s", hex.EncodeToString(closeTx))
 
+	if err := s.State.validateTx(closeTx); err != nil {
+		t.Errorf("validateTx error: %v", err)
+	}
+
 	s.CloseMined()
 	s.CloseMined()
+}
+
+func TestRefund(t *testing.T) {
+	net, senderWIF, receiverWIF := setUp(t)
+
+	s, err := OpenChannel(net, senderWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.State.Timeout = 1
+
+	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.ReceivedPubKey(r.State.ReceiverPubKey)
+
+	_, addr, err := s.State.GetFundingScript()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Errorf("funding address: %s", addr)
+
+	const (
+		txid   = "f4c7b41725dbc9111293a82cae6299aa9e9bf93bc8d46676d4f3a48923329c86"
+		vout   = 0
+		amount = 1000000
+		height = 100
+	)
+	s.FundingTxMined(txid, vout, amount, height)
+
+	refundTx, err := s.Refund()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Errorf("refundTx: %s", hex.EncodeToString(refundTx))
+
+	if err := s.State.validateTx(refundTx); err != nil {
+		t.Errorf("validateTx error: %v", err)
+	}
 }

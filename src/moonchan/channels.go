@@ -14,11 +14,11 @@ import (
 type Status int
 
 const (
-	StatusNotStarted       = 1
-	StatusPreInfoGathered  = 2
-	StatusFundingBroadcast = 3
-	StatusClosing          = 4
-	StatusClosed           = 5
+	StatusNotStarted      = 1
+	StatusPreInfoGathered = 2
+	StatusOpen            = 3
+	StatusClosing         = 4
+	StatusClosed          = 5
 )
 
 const defaultTimeout = 144
@@ -139,7 +139,7 @@ func (r *Receiver) FundingTxMined(txid string, vout uint32, amount int64, height
 	r.State.FundingVout = vout
 	r.State.FundingAmount = amount
 	r.State.BlockHeight = height
-	r.State.Status = StatusFundingBroadcast
+	r.State.Status = StatusOpen
 }
 
 func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height int) {
@@ -147,7 +147,7 @@ func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height i
 	s.State.FundingVout = vout
 	s.State.FundingAmount = amount
 	s.State.BlockHeight = height
-	s.State.Status = StatusFundingBroadcast
+	s.State.Status = StatusOpen
 }
 
 func (s *Sender) CloseBegin() ([]byte, error) {
@@ -204,5 +204,6 @@ func (r *Receiver) CloseMined() {
 	r.State.Status = StatusClosed
 }
 
-func (s *Sender) Refund() {
+func (s *Sender) Refund() ([]byte, error) {
+	return s.State.GetRefundTxSigned(s.PrivKey)
 }
