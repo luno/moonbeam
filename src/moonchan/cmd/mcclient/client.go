@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 
+	"moonchan/channels"
 	"moonchan/client"
 	"moonchan/models"
 )
@@ -28,8 +29,12 @@ func output(req interface{}, resp interface{}, err error) error {
 	return err
 }
 
+func getNet() *chaincfg.Params {
+	return &chaincfg.TestNet3Params
+}
+
 func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
-	net := &chaincfg.TestNet3Params
+	net := getNet()
 
 	const wifstr = "cRTgZtoTP8ueH4w7nob5reYTKpFLHvDV9UfUfa67f3SMCaZkGB6L"
 	wif, err := btcutil.DecodeWIF(wifstr)
@@ -47,16 +52,46 @@ func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
 }
 
 func create() error {
-	pubkey, _, err := loadkey()
+	privkey, _, err := loadkey()
+	if err != nil {
+		return err
+	}
+	net := getNet()
+
+	s, err := channels.OpenChannel(net, privkey)
 	if err != nil {
 		return err
 	}
 
 	c := client.NewClient(*host)
 	var req models.CreateRequest
-	req.SenderPubKey = pubkey.PubKey().SerializeCompressed()
+	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
 	resp, err := c.Create(req)
-	return output(req, resp, err)
+	output(req, resp, err)
+	if err != nil {
+		return err
+	}
+
+	receiverPubKey, err := btcutil.NewAddressPubKey(resp.ReceiverPubKey, net)
+	if err != nil {
+		return err
+	}
+
+	s.ReceivedPubKey(receiverPubKey)
+
+	_, addr, err := s.State.GetFundingScript()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Funding address: %s\n", addr)
+
+	// Sanity check to make sure client and server both agree on the state.
+	if addr != resp.FundingAddress {
+		return errors.New("")
+	}
+
+	return nil
 }
 
 func outputError(err string) {
@@ -72,9 +107,10 @@ func main() {
 		outputError("missing command")
 		return
 	}
+	action := args[0]
 
 	err := errors.New("unknown command")
-	switch args[0] {
+	switch action {
 	case "create":
 		err = create()
 	}

@@ -55,6 +55,16 @@ func (ss *SharedState) validateAmount(amount int64) (int64, error) {
 	return newBalance, nil
 }
 
+func DefaultState(net *chaincfg.Params) SharedState {
+	return SharedState{
+		Version: 1,
+		Net:     net,
+		Timeout: defaultTimeout,
+		Fee:     5000,
+		Status:  StatusNotStarted,
+	}
+}
+
 type Sender struct {
 	State   SharedState
 	PrivKey *btcec.PrivateKey
@@ -71,15 +81,11 @@ func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey) (*Sender, erro
 		return nil, err
 	}
 
+	ss := DefaultState(net)
+	ss.SenderPubKey = pubKey
+
 	c := Sender{
-		State: SharedState{
-			Version:      1,
-			Net:          net,
-			Timeout:      defaultTimeout,
-			Fee:          5000,
-			Status:       StatusNotStarted,
-			SenderPubKey: pubKey,
-		},
+		State:   ss,
 		PrivKey: privKey,
 	}
 	return &c, nil

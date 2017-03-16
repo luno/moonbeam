@@ -8,4 +8,6 @@ type CreateResponse struct {
 	ID string
 
 	ReceiverPubKey []byte
+
+	FundingAddress string
 }

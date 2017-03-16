@@ -52,13 +52,8 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	ss := channels.SharedState{
-		Version:      1,
-		Net:          r.Net,
-		Timeout:      144,
-		Fee:          1000,
-		SenderPubKey: senderPubKey,
-	}
+	ss := channels.DefaultState(r.Net)
+	ss.SenderPubKey = senderPubKey
 
 	c, err := channels.AcceptChannel(ss, r.privKey)
 	if err != nil {
@@ -73,9 +68,15 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 
 	receiverPubKey := c.State.ReceiverPubKey.PubKey().SerializeCompressed()
 
+	_, addr, err := c.State.GetFundingScript()
+	if err != nil {
+		return nil, err
+	}
+
 	resp := models.CreateResponse{
 		ID:             id,
 		ReceiverPubKey: receiverPubKey,
+		FundingAddress: addr,
 	}
 	return &resp, nil
 }
