@@ -1,9 +1,7 @@
 package channels
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"math/big"
+	"errors"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -40,22 +38,26 @@ type SharedState struct {
 	BlockHeight   int
 
 	Balance int64
+	Count   int
 }
 
-func genSeed() (*big.Int, error) {
-	n := big.NewInt(1)
-	n = n.Lsh(n, 256)
-	return rand.Int(rand.Reader, n)
+func (ss *SharedState) validateAmount(amount int64) (int64, error) {
+	if amount <= 0 {
+		return ss.Balance, errors.New("amount must be positive")
+	}
+
+	newBalance := ss.Balance + amount
+
+	if newBalance+ss.Fee > ss.FundingAmount {
+		return ss.Balance, errors.New("insufficient channel capacity")
+	}
+
+	return newBalance, nil
 }
 
 type Sender struct {
-	State SharedState
-
-	RevocationKeys [][]byte
-
-	// Secrets
-	PrivKey    *btcec.PrivateKey
-	SecretSeed *big.Int
+	State   SharedState
+	PrivKey *btcec.PrivateKey
 }
 
 func derivePubKey(privKey *btcec.PrivateKey, net *chaincfg.Params) (*btcutil.AddressPubKey, error) {
@@ -63,21 +65,8 @@ func derivePubKey(privKey *btcec.PrivateKey, net *chaincfg.Params) (*btcutil.Add
 	return btcutil.NewAddressPubKey(pk.SerializeCompressed(), net)
 }
 
-func deriveSecret(seed *big.Int, n int64) []byte {
-	var r *big.Int
-	r.Add(seed, big.NewInt(n))
-	buf := []byte(r.String())
-	hash := sha256.Sum256(buf)
-	return hash[:]
-}
-
 func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey) (*Sender, error) {
 	pubKey, err := derivePubKey(privKey, net)
-	if err != nil {
-		return nil, err
-	}
-
-	seed, err := genSeed()
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +80,7 @@ func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey) (*Sender, erro
 			Status:       StatusNotStarted,
 			SenderPubKey: pubKey,
 		},
-		PrivKey:    privKey,
-		SecretSeed: seed,
+		PrivKey: privKey,
 	}
 	return &c, nil
 }
@@ -102,13 +90,9 @@ func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey) {
 }
 
 type Receiver struct {
-	State SharedState
-
-	RevocationKeys [][]byte
-
-	// Secrets
-	PrivKey    *btcec.PrivateKey
-	SecretSeed *big.Int
+	State     SharedState
+	PrivKey   *btcec.PrivateKey
+	SenderSig []byte
 }
 
 func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error) {
@@ -117,41 +101,45 @@ func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, err
 		return nil, err
 	}
 
-	seed, err := genSeed()
-	if err != nil {
-		return nil, err
-	}
-
 	state.ReceiverPubKey = pubKey
 	state.Status = StatusPreInfoGathered
 
 	c := Receiver{
-		State:      state,
-		PrivKey:    privKey,
-		SecretSeed: seed,
+		State:   state,
+		PrivKey: privKey,
 	}
 
 	return &c, nil
 }
 
-func (r *Receiver) FundingTxMined(txid string, vout uint32, amount int64, height int) {
-	r.State.FundingTxID = txid
-	r.State.FundingVout = vout
-	r.State.FundingAmount = amount
-	r.State.BlockHeight = height
-	r.State.Status = StatusOpen
-}
-
-func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height int) {
+func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height int) ([]byte, error) {
 	s.State.FundingTxID = txid
 	s.State.FundingVout = vout
 	s.State.FundingAmount = amount
 	s.State.BlockHeight = height
 	s.State.Status = StatusOpen
+
+	return s.signBalance(0)
 }
 
-func (s *Sender) CloseBegin() ([]byte, error) {
-	tx, err := s.State.GetClosureTx()
+func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, senderSig []byte) error {
+	r.State.FundingTxID = txid
+	r.State.FundingVout = vout
+	r.State.FundingAmount = amount
+	r.State.BlockHeight = height
+
+	if err := r.validateSenderSig(0, senderSig); err != nil {
+		return err
+	}
+
+	r.SenderSig = senderSig
+	r.State.Status = StatusOpen
+
+	return nil
+}
+
+func (s *Sender) signBalance(balance int64) ([]byte, error) {
+	tx, err := s.State.GetClosureTx(balance)
 	if err != nil {
 		return nil, err
 	}
@@ -161,35 +149,62 @@ func (s *Sender) CloseBegin() ([]byte, error) {
 		return nil, err
 	}
 
-	sig, err := txscript.RawTxInSignature(
+	return txscript.RawTxInSignature(
 		tx, 0, script, txscript.SigHashAll, s.PrivKey)
-	if err != nil {
-		return nil, err
-	}
-
-	s.State.Status = StatusClosing
-
-	return sig, nil
 }
 
-func (r *Receiver) CloseReceived(senderSig []byte) ([]byte, error) {
-	tx, err := r.State.GetClosureTx()
+func (s *Sender) PrepareSend(amount int64) ([]byte, error) {
+	newBalance, err := s.State.validateAmount(amount)
 	if err != nil {
 		return nil, err
 	}
+	return s.signBalance(newBalance)
+}
 
-	script, _, err := r.State.GetFundingScript()
+func (r *Receiver) validateSenderSig(balance int64, senderSig []byte) error {
+	rawTx, err := r.State.GetClosureTxSigned(balance, senderSig, r.PrivKey)
+	if err != nil {
+		return err
+	}
+
+	// make sure the sender's sig is valid
+	if err := r.State.validateTx(rawTx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Receiver) Send(amount int64, senderSig []byte) error {
+	if r.State.Status != StatusOpen {
+		return errors.New("channel not open")
+	}
+
+	newBalance, err := r.State.validateAmount(amount)
+	if err != nil {
+		return err
+	}
+
+	if err := r.validateSenderSig(newBalance, senderSig); err != nil {
+		return err
+	}
+
+	// all good, update the state
+	// lock
+	// if not open, error
+	r.State.Count++
+	r.State.Balance = newBalance
+	r.SenderSig = senderSig
+	// unlock
+
+	return nil
+}
+
+func (r *Receiver) Close() ([]byte, error) {
+	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.SenderSig, r.PrivKey)
 	if err != nil {
 		return nil, err
 	}
-
-	receiverSig, err := txscript.RawTxInSignature(
-		tx, 0, script, txscript.SigHashAll, r.PrivKey)
-	if err != nil {
-		return nil, err
-	}
-
-	rawTx, err := r.State.GetClosureTxSigned(senderSig, receiverSig)
 
 	r.State.Status = StatusClosing
 

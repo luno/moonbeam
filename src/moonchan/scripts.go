@@ -79,9 +79,11 @@ func sendToAddress(amount int64, addr *btcutil.AddressPubKey) (*wire.TxOut, erro
 	}, nil
 }
 
-func (s *SharedState) GetClosureTx() (*wire.MsgTx, error) {
-	receiveAmount := s.Balance
-	senderAmount := s.FundingAmount - s.Balance - s.Fee
+func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
+	receiveAmount := balance
+	senderAmount := s.FundingAmount - balance - s.Fee
+
+	// TODO: handle dust output case
 
 	tx, err := s.spendFundingTx()
 	if err != nil {
@@ -107,13 +109,19 @@ func (s *SharedState) GetClosureTx() (*wire.MsgTx, error) {
 	return tx, nil
 }
 
-func (s *SharedState) GetClosureTxSigned(senderSig, receiverSig []byte) ([]byte, error) {
-	tx, err := s.GetClosureTx()
+func (s *SharedState) GetClosureTxSigned(balance int64, senderSig []byte, privKey *btcec.PrivateKey) ([]byte, error) {
+	tx, err := s.GetClosureTx(balance)
 	if err != nil {
 		return nil, err
 	}
 
 	script, _, err := s.GetFundingScript()
+	if err != nil {
+		return nil, err
+	}
+
+	receiverSig, err := txscript.RawTxInSignature(
+		tx, 0, script, txscript.SigHashAll, privKey)
 	if err != nil {
 		return nil, err
 	}

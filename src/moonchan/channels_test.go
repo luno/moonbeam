@@ -25,7 +25,7 @@ func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 	return net, senderWIF, receiverWIF
 }
 
-func TestFlow(t *testing.T) {
+func TestImmediateClose(t *testing.T) {
 	net, senderWIF, receiverWIF := setUp(t)
 
 	s, err := OpenChannel(net, senderWIF.PrivKey)
@@ -52,15 +52,15 @@ func TestFlow(t *testing.T) {
 		amount = 1000000
 		height = 100
 	)
-	r.FundingTxMined(txid, vout, amount, height)
-	s.FundingTxMined(txid, vout, amount, height)
-
-	sig, err := s.CloseBegin()
+	sig, err := s.FundingTxMined(txid, vout, amount, height)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := r.Open(txid, vout, amount, height, sig); err != nil {
+		t.Fatal(err)
+	}
 
-	closeTx, err := r.CloseReceived(sig)
+	closeTx, err := r.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestFlow(t *testing.T) {
 	}
 
 	s.CloseMined()
-	s.CloseMined()
+	r.CloseMined()
 }
 
 func TestRefund(t *testing.T) {
@@ -114,4 +114,64 @@ func TestRefund(t *testing.T) {
 	if err := s.State.validateTx(refundTx); err != nil {
 		t.Errorf("validateTx error: %v", err)
 	}
+}
+
+func TestSend(t *testing.T) {
+	net, senderWIF, receiverWIF := setUp(t)
+
+	s, err := OpenChannel(net, senderWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.ReceivedPubKey(r.State.ReceiverPubKey)
+
+	_, addr, err := s.State.GetFundingScript()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Errorf("funding address: %s", addr)
+
+	const (
+		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout       = 1
+		fundAmount = 1000000
+		height     = 100
+	)
+	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Open(txid, vout, fundAmount, height, sig); err != nil {
+		t.Fatal(err)
+	}
+
+	const amount = 1000
+
+	sig, err = s.PrepareSend(amount)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.Send(amount, sig); err != nil {
+		t.Fatal(err)
+	}
+
+	closeTx, err := r.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Errorf("closeTx: %s", hex.EncodeToString(closeTx))
+
+	if err := s.State.validateTx(closeTx); err != nil {
+		t.Errorf("validateTx error: %v", err)
+	}
+
+	s.CloseMined()
+	r.CloseMined()
 }
