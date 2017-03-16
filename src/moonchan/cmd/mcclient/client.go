@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -51,6 +52,10 @@ func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
 	return wif.PrivKey, pubkey, nil
 }
 
+func getClient() *client.Client {
+	return client.NewClient(*host)
+}
+
 func create() error {
 	privkey, _, err := loadkey()
 	if err != nil {
@@ -63,7 +68,7 @@ func create() error {
 		return err
 	}
 
-	c := client.NewClient(*host)
+	c := getClient()
 	var req models.CreateRequest
 	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
 	resp, err := c.Create(req)
@@ -88,8 +93,79 @@ func create() error {
 
 	// Sanity check to make sure client and server both agree on the state.
 	if addr != resp.FundingAddress {
-		return errors.New("")
+		return errors.New("state discrepancy")
 	}
+
+	if _, ok := globalState.Channels[resp.ID]; ok {
+		return errors.New("reused channel id")
+	}
+	ss, err := s.State.ToSimple()
+	if err != nil {
+		return err
+	}
+
+	globalState.Channels[resp.ID] = *ss
+
+	return nil
+}
+
+func fund(args []string) error {
+	id := args[0]
+	txid := args[1]
+	vout, err := strconv.Atoi(args[2])
+	if err != nil {
+		return errors.New("invalid vout")
+	}
+	amount, err := strconv.ParseInt(args[3], 10, 64)
+	if err != nil {
+		return errors.New("invalid amount")
+	}
+	height := 0
+
+	s, ok := globalState.Channels[id]
+	if !ok {
+		return errors.New("unknown id")
+	}
+	ss, err := channels.FromSimple(s)
+	if err != nil {
+		return err
+	}
+
+	privkey, _, err := loadkey()
+	if err != nil {
+		return err
+	}
+
+	sender, err := channels.NewSender(*ss, privkey)
+	if err != nil {
+		return err
+	}
+
+	sig, err := sender.FundingTxMined(txid, uint32(vout), amount, height)
+	if err != nil {
+		return err
+	}
+
+	c := getClient()
+	req := models.OpenRequest{
+		ID:        id,
+		TxID:      txid,
+		Vout:      uint32(vout),
+		Amount:    amount,
+		Height:    height,
+		SenderSig: sig,
+	}
+	resp, err := c.Open(req)
+	output(req, resp, err)
+	if err != nil {
+		return err
+	}
+
+	newState, err := sender.State.ToSimple()
+	if err != nil {
+		return err
+	}
+	globalState.Channels[id] = *newState
 
 	return nil
 }
@@ -109,10 +185,21 @@ func main() {
 	}
 	action := args[0]
 
-	err := errors.New("unknown command")
+	s, err := load()
+	if err != nil {
+		outputError(err.Error())
+	}
+	globalState = s
+
+	err = errors.New("unknown command")
 	switch action {
 	case "create":
 		err = create()
+	case "fund":
+		err = fund(args[1:])
+	}
+	if err == nil {
+		err = save(globalState)
 	}
 	if err != nil {
 		outputError(err.Error())

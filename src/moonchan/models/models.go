@@ -11,3 +11,16 @@ type CreateResponse struct {
 
 	FundingAddress string
 }
+
+type OpenRequest struct {
+	ID string
+
+	TxID      string
+	Vout      uint32
+	Amount    int64
+	Height    int
+	SenderSig []byte
+}
+
+type OpenResponse struct {
+}

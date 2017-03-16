@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -79,4 +80,21 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		FundingAddress: addr,
 	}
 	return &resp, nil
+}
+
+func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	c, ok := r.Channels[req.ID]
+	if !ok {
+		return nil, errors.New("unknown channel")
+	}
+
+	err := c.Open(req.TxID, req.Vout, req.Amount, req.Height, req.SenderSig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.OpenResponse{}, nil
 }

@@ -70,6 +70,10 @@ type Sender struct {
 	PrivKey *btcec.PrivateKey
 }
 
+func NewSender(state SharedState, privKey *btcec.PrivateKey) (*Sender, error) {
+	return &Sender{state, privKey}, nil
+}
+
 func derivePubKey(privKey *btcec.PrivateKey, net *chaincfg.Params) (*btcutil.AddressPubKey, error) {
 	pk := (*btcec.PublicKey)(&privKey.PublicKey)
 	return btcutil.NewAddressPubKey(pk.SerializeCompressed(), net)
