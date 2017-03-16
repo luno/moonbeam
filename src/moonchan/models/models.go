@@ -24,3 +24,13 @@ type OpenRequest struct {
 
 type OpenResponse struct {
 }
+
+type SendRequest struct {
+	ID string
+
+	Amount    int64
+	SenderSig []byte
+}
+
+type SendResponse struct {
+}

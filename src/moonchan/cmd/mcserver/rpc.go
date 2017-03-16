@@ -48,3 +48,13 @@ func rpcOpenHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request
 	resp, err := s.Open(req)
 	respond(w, r, resp, err)
 }
+
+func rpcSendHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
+	var req models.SendRequest
+	if !parse(w, r, &req) {
+		return
+	}
+	log.Printf("req: %+v", req)
+	resp, err := s.Send(req)
+	respond(w, r, resp, err)
+}

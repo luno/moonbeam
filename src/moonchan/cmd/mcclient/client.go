@@ -170,6 +170,58 @@ func fund(args []string) error {
 	return nil
 }
 
+func send(args []string) error {
+	id := args[0]
+	amount, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		return errors.New("invalid amount")
+	}
+
+	s, ok := globalState.Channels[id]
+	if !ok {
+		return errors.New("unknown id")
+	}
+	ss, err := channels.FromSimple(s)
+	if err != nil {
+		return err
+	}
+
+	privkey, _, err := loadkey()
+	if err != nil {
+		return err
+	}
+
+	sender, err := channels.NewSender(*ss, privkey)
+	if err != nil {
+		return err
+	}
+
+	sig, err := sender.PrepareSend(amount)
+	if err != nil {
+		return err
+	}
+
+	c := getClient()
+	req := models.SendRequest{
+		ID:        id,
+		Amount:    amount,
+		SenderSig: sig,
+	}
+	resp, err := c.Send(req)
+	output(req, resp, err)
+	if err != nil {
+		return err
+	}
+
+	newState, err := sender.State.ToSimple()
+	if err != nil {
+		return err
+	}
+	globalState.Channels[id] = *newState
+
+	return nil
+}
+
 func outputError(err string) {
 	fmt.Printf("%v\n", err)
 	os.Exit(1)
@@ -197,6 +249,8 @@ func main() {
 		err = create()
 	case "fund":
 		err = fund(args[1:])
+	case "send":
+		err = send(args[1:])
 	}
 	if err == nil {
 		err = save(globalState)

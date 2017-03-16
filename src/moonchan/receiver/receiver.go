@@ -98,3 +98,20 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 
 	return &models.OpenResponse{}, nil
 }
+
+func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	c, ok := r.Channels[req.ID]
+	if !ok {
+		return nil, errors.New("unknown channel")
+	}
+
+	err := c.Send(req.Amount, req.SenderSig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.SendResponse{}, nil
+}
