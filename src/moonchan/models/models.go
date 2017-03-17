@@ -40,4 +40,5 @@ type CloseRequest struct {
 }
 
 type CloseResponse struct {
+	CloseTx []byte
 }

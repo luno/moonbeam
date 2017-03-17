@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -199,6 +200,8 @@ func closeAction(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("%s\n", hex.EncodeToString(resp.CloseTx))
 
 	return storeChannel(id, sender)
 }

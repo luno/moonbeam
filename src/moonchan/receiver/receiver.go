@@ -125,10 +125,10 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 		return nil, errors.New("unknown channel")
 	}
 
-	_, err := c.Close()
+	rawTx, err := c.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	return &models.CloseResponse{}, nil
+	return &models.CloseResponse{rawTx}, nil
 }
