@@ -106,6 +106,8 @@ var detailsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 
 <h1>Channel {{.ID}}</h1>
 
+<p>ID: {{.ID}}</p>
+
 <pre>{{.StateJSON}}</pre>
 
 </div>

@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sync"
@@ -8,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
 
@@ -150,7 +152,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	if conf < 3 {
+	if conf < 1 {
 		return nil, errors.New("too few confirmations")
 	}
 	if conf > int(c.State.Timeout)/2 {
@@ -193,6 +195,16 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	rawTx, err := c.Close()
 	if err != nil {
+		return nil, err
+	}
+
+	var tx wire.MsgTx
+	err = tx.BtcDecode(bytes.NewReader(rawTx), wire.ProtocolVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := r.bc.SendRawTransaction(&tx, false); err != nil {
 		return nil, err
 	}
 
