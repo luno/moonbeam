@@ -122,21 +122,7 @@ func fund(args []string) error {
 	}
 	height := 0
 
-	s, ok := globalState.Channels[id]
-	if !ok {
-		return errors.New("unknown id")
-	}
-	ss, err := channels.FromSimple(s)
-	if err != nil {
-		return err
-	}
-
-	privkey, _, err := loadkey()
-	if err != nil {
-		return err
-	}
-
-	sender, err := channels.NewSender(*ss, privkey)
+	sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -161,13 +147,7 @@ func fund(args []string) error {
 		return err
 	}
 
-	newState, err := sender.State.ToSimple()
-	if err != nil {
-		return err
-	}
-	globalState.Channels[id] = *newState
-
-	return nil
+	return storeChannel(id, sender)
 }
 
 func send(args []string) error {
@@ -177,21 +157,7 @@ func send(args []string) error {
 		return errors.New("invalid amount")
 	}
 
-	s, ok := globalState.Channels[id]
-	if !ok {
-		return errors.New("unknown id")
-	}
-	ss, err := channels.FromSimple(s)
-	if err != nil {
-		return err
-	}
-
-	privkey, _, err := loadkey()
-	if err != nil {
-		return err
-	}
-
-	sender, err := channels.NewSender(*ss, privkey)
+	sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -213,13 +179,7 @@ func send(args []string) error {
 		return err
 	}
 
-	newState, err := sender.State.ToSimple()
-	if err != nil {
-		return err
-	}
-	globalState.Channels[id] = *newState
-
-	return nil
+	return storeChannel(id, sender)
 }
 
 func outputError(err string) {

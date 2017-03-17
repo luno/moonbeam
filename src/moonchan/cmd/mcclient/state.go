@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -61,3 +62,35 @@ func load() (*State, error) {
 }
 
 var globalState *State
+
+func getChannel(id string) (*channels.Sender, error) {
+	s, ok := globalState.Channels[id]
+	if !ok {
+		return nil, errors.New("unknown id")
+	}
+	ss, err := channels.FromSimple(s)
+	if err != nil {
+		return nil, err
+	}
+
+	privkey, _, err := loadkey()
+	if err != nil {
+		return nil, err
+	}
+
+	sender, err := channels.NewSender(*ss, privkey)
+	if err != nil {
+		return nil, err
+	}
+
+	return sender, nil
+}
+
+func storeChannel(id string, sender *channels.Sender) error {
+	newState, err := sender.State.ToSimple()
+	if err != nil {
+		return err
+	}
+	globalState.Channels[id] = *newState
+	return nil
+}
