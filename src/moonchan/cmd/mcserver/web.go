@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -17,41 +18,44 @@ func render(t *template.Template, w http.ResponseWriter, data interface{}) {
 	}
 }
 
-var indexT = template.Must(template.New("index").Parse(`<html>
+var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
+<html>
 <head>
 <title>Moonchan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 <style>
-table {
-  width: 100%;
-}
-td {
-  border: 1px solid black;
-  border-collapse: collapse;
-}
 </style>
 </head>
 <body>
+<div class="container">
+
 <h1>Moonchan</h1>
 
-<table>
+<table class="table">
+<thead>
 <tr>
-<td>ID</td>
-<td>Status</td>
-<td>Capacity</td>
-<td>Balance</td>
-<td>Count</td>
+<th>ID</th>
+<th>Status</th>
+<th>Capacity</th>
+<th>Balance</th>
+<th>Count</th>
 </tr>
+</thead>
+<tbody>
 {{range .ChanItems}}
 <tr>
-<td>{{.ID}}</td>
+<td><a href="/details?id={{.ID}}">{{.ID}}</a></td>
 <td>{{.State.Status}}</td>
 <td>{{.State.FundingAmount}}</td>
 <td>{{.State.Balance}}</td>
 <td>{{.State.Count}}</td>
 </tr>
 {{end}}
+</tbody>
 </table>
 
+</div>
 </body>
 </html>`))
 
@@ -86,4 +90,51 @@ func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 		ChanItems []chanItem
 	}{items}
 	render(indexT, w, c)
+}
+
+var detailsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
+<html>
+<head>
+<title>Moonchan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<style>
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Channel {{.ID}}</h1>
+
+<pre>{{.StateJSON}}</pre>
+
+</div>
+</body>
+</html>`))
+
+func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
+	s := ss.Receiver.Get(id)
+	if s == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	simple, err := s.ToSimple()
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+
+	buf, err := json.MarshalIndent(simple, "", "   ")
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+
+	c := struct {
+		ID        string
+		StateJSON string
+	}{id, string(buf)}
+	render(detailsT, w, c)
 }

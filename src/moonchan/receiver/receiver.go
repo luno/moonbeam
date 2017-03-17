@@ -40,6 +40,16 @@ func NewReceiver(net *chaincfg.Params, privKey *btcec.PrivateKey, bc *btcrpcclie
 	}
 }
 
+func (r *Receiver) Get(id string) *channels.SharedState {
+	r.mu.Lock()
+	s, ok := r.Channels[id]
+	r.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	return &s.State
+}
+
 func (r *Receiver) List() map[string]channels.SharedState {
 	ssl := make(map[string]channels.SharedState)
 

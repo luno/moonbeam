@@ -81,6 +81,7 @@ func main() {
 	ss := &ServerState{privKey, bc, s}
 
 	http.HandleFunc("/", wrap(ss, indexHandler))
+	http.HandleFunc("/details", wrap(ss, detailsHandler))
 
 	http.HandleFunc("/api/create", wrap(ss, rpcCreateHandler))
 	http.HandleFunc("/api/open", wrap(ss, rpcOpenHandler))
