@@ -204,6 +204,24 @@ func closeAction(args []string) error {
 	return storeChannel(id, sender)
 }
 
+func refund(args []string) error {
+	id := args[0]
+
+	sender, err := getChannel(id)
+	if err != nil {
+		return err
+	}
+
+	rawTx, err := sender.Refund()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", hex.EncodeToString(rawTx))
+
+	return nil
+}
+
 func outputError(err string) {
 	fmt.Printf("%v\n", err)
 	os.Exit(1)
@@ -236,6 +254,8 @@ func main() {
 		err = send(args)
 	case "close":
 		err = closeAction(args)
+	case "refund":
+		err = refund(args)
 	}
 	if err == nil {
 		err = save(globalState)
