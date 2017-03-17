@@ -115,3 +115,20 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 
 	return &models.SendResponse{}, nil
 }
+
+func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	c, ok := r.Channels[req.ID]
+	if !ok {
+		return nil, errors.New("unknown channel")
+	}
+
+	_, err := c.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.CloseResponse{}, nil
+}

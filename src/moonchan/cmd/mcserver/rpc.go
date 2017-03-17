@@ -58,3 +58,13 @@ func rpcSendHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request
 	resp, err := s.Send(req)
 	respond(w, r, resp, err)
 }
+
+func rpcCloseHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
+	var req models.CloseRequest
+	if !parse(w, r, &req) {
+		return
+	}
+	log.Printf("req: %+v", req)
+	resp, err := s.Close(req)
+	respond(w, r, resp, err)
+}

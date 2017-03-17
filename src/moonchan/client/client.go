@@ -84,3 +84,11 @@ func (c *Client) Send(req models.SendRequest) (*models.SendResponse, error) {
 	}
 	return &resp, nil
 }
+
+func (c *Client) Close(req models.CloseRequest) (*models.CloseResponse, error) {
+	var resp models.CloseResponse
+	if err := c.post("/api/close", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}

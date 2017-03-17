@@ -34,3 +34,10 @@ type SendRequest struct {
 
 type SendResponse struct {
 }
+
+type CloseRequest struct {
+	ID string
+}
+
+type CloseResponse struct {
+}

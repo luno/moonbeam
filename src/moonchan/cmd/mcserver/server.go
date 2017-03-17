@@ -51,6 +51,7 @@ func main() {
 	http.HandleFunc("/api/create", wrap(s, rpcCreateHandler))
 	http.HandleFunc("/api/open", wrap(s, rpcOpenHandler))
 	http.HandleFunc("/api/send", wrap(s, rpcSendHandler))
+	http.HandleFunc("/api/close", wrap(s, rpcCloseHandler))
 
 	log.Fatal(http.ListenAndServe(":3211", nil))
 }

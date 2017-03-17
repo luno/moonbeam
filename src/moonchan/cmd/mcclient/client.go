@@ -182,6 +182,27 @@ func send(args []string) error {
 	return storeChannel(id, sender)
 }
 
+func closeAction(args []string) error {
+	id := args[0]
+
+	sender, err := getChannel(id)
+	if err != nil {
+		return err
+	}
+
+	c := getClient()
+	req := models.CloseRequest{
+		ID: id,
+	}
+	resp, err := c.Close(req)
+	output(req, resp, err)
+	if err != nil {
+		return err
+	}
+
+	return storeChannel(id, sender)
+}
+
 func outputError(err string) {
 	fmt.Printf("%v\n", err)
 	os.Exit(1)
@@ -196,6 +217,7 @@ func main() {
 		return
 	}
 	action := args[0]
+	args = args[1:]
 
 	s, err := load()
 	if err != nil {
@@ -208,9 +230,11 @@ func main() {
 	case "create":
 		err = create()
 	case "fund":
-		err = fund(args[1:])
+		err = fund(args)
 	case "send":
-		err = send(args[1:])
+		err = send(args)
+	case "close":
+		err = closeAction(args)
 	}
 	if err == nil {
 		err = save(globalState)
