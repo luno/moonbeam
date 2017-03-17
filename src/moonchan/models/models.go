@@ -15,10 +15,9 @@ type CreateResponse struct {
 type OpenRequest struct {
 	ID string
 
-	TxID      string
-	Vout      uint32
-	Amount    int64
-	Height    int
+	TxID string
+	Vout uint32
+
 	SenderSig []byte
 }
 

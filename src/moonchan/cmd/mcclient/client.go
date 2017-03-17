@@ -138,8 +138,6 @@ func fund(args []string) error {
 		ID:        id,
 		TxID:      txid,
 		Vout:      uint32(vout),
-		Amount:    amount,
-		Height:    height,
 		SenderSig: sig,
 	}
 	resp, err := c.Open(req)

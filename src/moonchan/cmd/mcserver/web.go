@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"moonchan/channels"
-	"moonchan/receiver"
 )
 
 func render(t *template.Template, w http.ResponseWriter, data interface{}) {
@@ -73,8 +72,8 @@ func (items chanItems) Swap(i, j int) {
 	items[i], items[j] = items[j], items[i]
 }
 
-func indexHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
-	states := s.List()
+func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	states := ss.Receiver.List()
 	var items []chanItem
 	for id, state := range states {
 		item := chanItem{id, state}

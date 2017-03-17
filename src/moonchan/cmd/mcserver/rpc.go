@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"moonchan/models"
-	"moonchan/receiver"
 )
 
 func parse(w http.ResponseWriter, r *http.Request, req interface{}) bool {
@@ -29,42 +28,42 @@ func respond(w http.ResponseWriter, r *http.Request, resp interface{}, err error
 	}
 }
 
-func rpcCreateHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
+func rpcCreateHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	var req models.CreateRequest
 	if !parse(w, r, &req) {
 		return
 	}
 	log.Printf("req: %+v", req)
-	resp, err := s.Create(req)
+	resp, err := s.Receiver.Create(req)
 	respond(w, r, resp, err)
 }
 
-func rpcOpenHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
+func rpcOpenHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	var req models.OpenRequest
 	if !parse(w, r, &req) {
 		return
 	}
 	log.Printf("req: %+v", req)
-	resp, err := s.Open(req)
+	resp, err := s.Receiver.Open(req)
 	respond(w, r, resp, err)
 }
 
-func rpcSendHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
+func rpcSendHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	var req models.SendRequest
 	if !parse(w, r, &req) {
 		return
 	}
 	log.Printf("req: %+v", req)
-	resp, err := s.Send(req)
+	resp, err := s.Receiver.Send(req)
 	respond(w, r, resp, err)
 }
 
-func rpcCloseHandler(s *receiver.Receiver, w http.ResponseWriter, r *http.Request) {
+func rpcCloseHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	var req models.CloseRequest
 	if !parse(w, r, &req) {
 		return
 	}
 	log.Printf("req: %+v", req)
-	resp, err := s.Close(req)
+	resp, err := s.Receiver.Close(req)
 	respond(w, r, resp, err)
 }
