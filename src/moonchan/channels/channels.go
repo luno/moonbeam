@@ -211,6 +211,10 @@ func (r *Receiver) Send(amount int64, senderSig []byte) error {
 }
 
 func (r *Receiver) Close() ([]byte, error) {
+	if r.State.Status != StatusOpen && r.State.Status != StatusClosing {
+		return nil, errors.New("cannot close channel that isn't open")
+	}
+
 	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.SenderSig, r.PrivKey)
 	if err != nil {
 		return nil, err

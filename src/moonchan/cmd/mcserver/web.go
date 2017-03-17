@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"html/template"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"sort"
 
 	"moonchan/channels"
+	"moonchan/models"
 )
 
 func render(t *template.Template, w http.ResponseWriter, data interface{}) {
@@ -106,9 +108,16 @@ var detailsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 
 <h1>Channel {{.ID}}</h1>
 
+<p><a href="/">Home</a></p>
+
 <p>ID: {{.ID}}</p>
 
 <pre>{{.StateJSON}}</pre>
+
+<form action="/close" method="post">
+<input type="hidden" name="id" value="{{.ID}}">
+<button type="submit">Close Channel</button>
+</form>
 
 </div>
 </body>
@@ -139,4 +148,18 @@ func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 		StateJSON string
 	}{id, string(buf)}
 	render(detailsT, w, c)
+}
+
+func closeHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
+
+	req := models.CloseRequest{ID: id}
+
+	resp, err := ss.Receiver.Close(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(hex.EncodeToString(resp.CloseTx)))
 }

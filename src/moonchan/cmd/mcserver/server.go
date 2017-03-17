@@ -82,6 +82,7 @@ func main() {
 
 	http.HandleFunc("/", wrap(ss, indexHandler))
 	http.HandleFunc("/details", wrap(ss, detailsHandler))
+	http.HandleFunc("/close", wrap(ss, closeHandler))
 
 	http.HandleFunc("/api/create", wrap(ss, rpcCreateHandler))
 	http.HandleFunc("/api/open", wrap(ss, rpcOpenHandler))
