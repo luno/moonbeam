@@ -175,3 +175,51 @@ func TestSend(t *testing.T) {
 	s.CloseMined()
 	r.CloseMined()
 }
+
+func TestInvalidSendSig(t *testing.T) {
+	net, senderWIF, receiverWIF := setUp(t)
+
+	s, err := OpenChannel(net, senderWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.ReceivedPubKey(r.State.ReceiverPubKey)
+
+	if _, _, err := s.State.GetFundingScript(); err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout       = 1
+		fundAmount = 1000000
+		height     = 100
+	)
+	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Open(txid, vout, fundAmount, height, sig); err != nil {
+		t.Fatal(err)
+	}
+
+	const amount = 1000
+
+	if err := r.Send(amount, nil); err == nil {
+		t.Errorf("Expected error due invalid signature")
+	}
+
+	sig, err = s.PrepareSend(amount * 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Send(amount, sig); err == nil {
+		t.Errorf("Expected error due invalid signature")
+	}
+}

@@ -216,7 +216,7 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 		return errors.New("wrong number of inputs")
 	}
 
-	engine, err := txscript.NewEngine(pkscript, &tx, 0, 0, nil)
+	engine, err := txscript.NewEngine(pkscript, &tx, 0, txscript.StandardVerifyFlags, nil)
 	if err != nil {
 		return err
 	}
