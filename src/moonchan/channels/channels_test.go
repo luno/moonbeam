@@ -157,8 +157,21 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if err := r.Send(amount, sig); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SendAccepted(amount); err != nil {
+		t.Fatal(err)
+	}
+
+	sig, err = s.PrepareSend(amount * 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Send(amount*2, sig); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SendAccepted(amount * 2); err != nil {
 		t.Fatal(err)
 	}
 

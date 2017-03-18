@@ -178,6 +178,10 @@ func send(args []string) error {
 		return err
 	}
 
+	if err := sender.SendAccepted(amount); err != nil {
+		return err
+	}
+
 	return storeChannel(id, sender)
 }
 
