@@ -7,12 +7,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"moonchan/channels"
 	"moonchan/storage"
 )
 
 type FilesystemStorage struct {
+	mu  sync.RWMutex
 	dir string
 }
 
@@ -46,6 +48,9 @@ func (fs *FilesystemStorage) getIdFromPath(path string) (string, error) {
 }
 
 func (fs *FilesystemStorage) Get(id string) (*storage.Record, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
 	path, err := fs.getPath(id)
 	if err != nil {
 		return nil, err
@@ -76,6 +81,9 @@ func (fs *FilesystemStorage) Get(id string) (*storage.Record, error) {
 }
 
 func (fs *FilesystemStorage) List() ([]storage.Record, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
 	paths, err := filepath.Glob(fs.dir + "/*.json")
 	if err != nil {
 		return nil, err
@@ -112,6 +120,9 @@ func (fs *FilesystemStorage) Create(s channels.SharedState) (string, error) {
 		return "", err
 	}
 
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
 	n, err := fs.count()
 	if err != nil {
 		return "", err
@@ -147,6 +158,9 @@ func (fs *FilesystemStorage) Update(id string, s channels.SharedState) error {
 	if err != nil {
 		return err
 	}
+
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
 
 	f, err := os.OpenFile(path, os.O_WRONLY, 0666)
 	if err != nil {
