@@ -44,7 +44,7 @@ func TestImmediateClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Errorf("funding address: %s", addr)
+	t.Logf("funding address: %s", addr)
 
 	const (
 		txid   = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
@@ -64,7 +64,7 @@ func TestImmediateClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Errorf("closeTx: %s", hex.EncodeToString(closeTx))
+	t.Logf("closeTx: %s", hex.EncodeToString(closeTx))
 
 	if err := s.State.validateTx(closeTx); err != nil {
 		t.Errorf("validateTx error: %v", err)
@@ -95,7 +95,7 @@ func TestRefund(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Errorf("funding address: %s", addr)
+	t.Logf("funding address: %s", addr)
 
 	const (
 		txid   = "f4c7b41725dbc9111293a82cae6299aa9e9bf93bc8d46676d4f3a48923329c86"
@@ -109,7 +109,7 @@ func TestRefund(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Errorf("refundTx: %s", hex.EncodeToString(refundTx))
+	t.Logf("refundTx: %s", hex.EncodeToString(refundTx))
 
 	if err := s.State.validateTx(refundTx); err != nil {
 		t.Errorf("validateTx error: %v", err)
@@ -135,7 +135,7 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Errorf("funding address: %s", addr)
+	t.Logf("funding address: %s", addr)
 
 	const (
 		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
@@ -166,7 +166,7 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Errorf("closeTx: %s", hex.EncodeToString(closeTx))
+	t.Logf("closeTx: %s", hex.EncodeToString(closeTx))
 
 	if err := s.State.validateTx(closeTx); err != nil {
 		t.Errorf("validateTx error: %v", err)

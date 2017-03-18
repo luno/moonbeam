@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sort"
 
-	"moonchan/channels"
 	"moonchan/models"
+	"moonchan/storage"
 )
 
 func render(t *template.Template, w http.ResponseWriter, data interface{}) {
@@ -48,10 +48,10 @@ var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 {{range .ChanItems}}
 <tr>
 <td><a href="/details?id={{.ID}}">{{.ID}}</a></td>
-<td>{{.State.Status}}</td>
-<td>{{.State.FundingAmount}}</td>
-<td>{{.State.Balance}}</td>
-<td>{{.State.Count}}</td>
+<td>{{.SharedState.Status}}</td>
+<td>{{.SharedState.FundingAmount}}</td>
+<td>{{.SharedState.Balance}}</td>
+<td>{{.SharedState.Count}}</td>
 </tr>
 {{end}}
 </tbody>
@@ -61,12 +61,7 @@ var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 </body>
 </html>`))
 
-type chanItem struct {
-	ID    string
-	State channels.SharedState
-}
-
-type chanItems []chanItem
+type chanItems []storage.Record
 
 func (items chanItems) Len() int {
 	return len(items)
@@ -79,18 +74,17 @@ func (items chanItems) Swap(i, j int) {
 }
 
 func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
-	states := ss.Receiver.List()
-	var items []chanItem
-	for id, state := range states {
-		item := chanItem{id, state}
-		items = append(items, item)
+	recs, err := ss.Receiver.List()
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
 	}
 
-	sort.Sort(chanItems(items))
+	sort.Sort(chanItems(recs))
 
 	c := struct {
-		ChanItems []chanItem
-	}{items}
+		ChanItems []storage.Record
+	}{recs}
 	render(indexT, w, c)
 }
 

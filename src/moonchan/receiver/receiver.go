@@ -3,8 +3,6 @@ package receiver
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"sync"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -15,12 +13,14 @@ import (
 
 	"moonchan/channels"
 	"moonchan/models"
+	"moonchan/storage"
+	"moonchan/storage/memory"
 )
 
 type Receiver struct {
 	Net *chaincfg.Params
 
-	mu sync.Mutex
+	//mu sync.Mutex
 
 	// hdkeychain
 
@@ -28,40 +28,37 @@ type Receiver struct {
 
 	bc *btcrpcclient.Client
 
-	Count int
+	//Count int
 
-	Channels map[string]*channels.Receiver
+	//Channels map[string]*channels.Receiver
+
+	db storage.Storage
 }
 
 func NewReceiver(net *chaincfg.Params, privKey *btcec.PrivateKey, bc *btcrpcclient.Client) *Receiver {
+	ms := memory.NewMemoryStorage()
+
 	return &Receiver{
-		Net:      net,
-		privKey:  privKey,
-		bc:       bc,
-		Channels: make(map[string]*channels.Receiver),
+		Net:     net,
+		privKey: privKey,
+		bc:      bc,
+		db:      ms,
 	}
 }
 
 func (r *Receiver) Get(id string) *channels.SharedState {
-	r.mu.Lock()
-	s, ok := r.Channels[id]
-	r.mu.Unlock()
-	if !ok {
+	s, err := r.db.Get(id)
+	if err != nil {
 		return nil
 	}
-	return &s.State
+	if s == nil {
+		return nil
+	}
+	return &s.SharedState
 }
 
-func (r *Receiver) List() map[string]channels.SharedState {
-	ssl := make(map[string]channels.SharedState)
-
-	r.mu.Lock()
-	for id, rc := range r.Channels {
-		ssl[id] = rc.State
-	}
-	r.mu.Unlock()
-
-	return ssl
+func (r *Receiver) List() ([]storage.Record, error) {
+	return r.db.List()
 }
 
 func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, error) {
@@ -78,11 +75,10 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	r.mu.Lock()
-	r.Count++
-	id := fmt.Sprintf("mc%d", r.Count)
-	r.Channels[id] = c
-	r.mu.Unlock()
+	id, err := r.db.Create(c.State)
+	if err != nil {
+		return nil, err
+	}
 
 	receiverPubKey := c.State.ReceiverPubKey.PubKey().SerializeCompressed()
 
@@ -132,14 +128,24 @@ func getTxOut(bc *btcrpcclient.Client,
 	return value, int(txout.Confirmations), nil
 }
 
+func (r *Receiver) get(id string) (*channels.Receiver, error) {
+	rec, err := r.db.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := channels.NewReceiver(rec.SharedState, r.privKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
 func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	c, ok := r.Channels[req.ID]
-	if !ok {
-		return nil, errors.New("unknown channel")
+	c, err := r.get(req.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	_, addr, err := c.State.GetFundingScript()
@@ -164,20 +170,26 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
+	// FIXME: concurrent access
+	if err := r.db.Update(req.ID, c.State); err != nil {
+		return nil, err
+	}
+
 	return &models.OpenResponse{}, nil
 }
 
 func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	c, ok := r.Channels[req.ID]
-	if !ok {
-		return nil, errors.New("unknown channel")
+	c, err := r.get(req.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	err := c.Send(req.Amount, req.SenderSig)
-	if err != nil {
+	if err := c.Send(req.Amount, req.SenderSig); err != nil {
+		return nil, err
+	}
+
+	// FIXME: concurrent access
+	if err := r.db.Update(req.ID, c.State); err != nil {
 		return nil, err
 	}
 
@@ -185,16 +197,18 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 }
 
 func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	c, ok := r.Channels[req.ID]
-	if !ok {
-		return nil, errors.New("unknown channel")
+	c, err := r.get(req.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	rawTx, err := c.Close()
 	if err != nil {
+		return nil, err
+	}
+
+	// FIXME: concurrent access
+	if err := r.db.Update(req.ID, c.State); err != nil {
 		return nil, err
 	}
 

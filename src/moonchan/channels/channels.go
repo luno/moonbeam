@@ -19,7 +19,7 @@ const (
 	StatusClosed          = 5
 )
 
-const defaultTimeout = 144
+const defaultTimeout = 3 //144
 
 type SharedState struct {
 	Version int
@@ -37,8 +37,9 @@ type SharedState struct {
 	FundingAmount int64
 	BlockHeight   int
 
-	Balance int64
-	Count   int
+	Balance   int64
+	Count     int
+	SenderSig []byte
 }
 
 func (ss *SharedState) validateAmount(amount int64) (int64, error) {
@@ -100,9 +101,13 @@ func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey) {
 }
 
 type Receiver struct {
-	State     SharedState
-	PrivKey   *btcec.PrivateKey
-	SenderSig []byte
+	State   SharedState
+	PrivKey *btcec.PrivateKey
+	//SenderSig []byte
+}
+
+func NewReceiver(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error) {
+	return &Receiver{state, privKey}, nil
 }
 
 func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error) {
@@ -142,7 +147,7 @@ func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, send
 		return err
 	}
 
-	r.SenderSig = senderSig
+	r.State.SenderSig = senderSig
 	r.State.Status = StatusOpen
 
 	return nil
@@ -204,7 +209,7 @@ func (r *Receiver) Send(amount int64, senderSig []byte) error {
 	// if not open, error
 	r.State.Count++
 	r.State.Balance = newBalance
-	r.SenderSig = senderSig
+	r.State.SenderSig = senderSig
 	// unlock
 
 	return nil
@@ -215,7 +220,7 @@ func (r *Receiver) Close() ([]byte, error) {
 		return nil, errors.New("cannot close channel that isn't open")
 	}
 
-	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.SenderSig, r.PrivKey)
+	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.State.SenderSig, r.PrivKey)
 	if err != nil {
 		return nil, err
 	}
