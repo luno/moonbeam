@@ -67,7 +67,7 @@ func (items chanItems) Len() int {
 	return len(items)
 }
 func (items chanItems) Less(i, j int) bool {
-	return items[i].ID < items[j].ID
+	return items[i].ID > items[j].ID
 }
 func (items chanItems) Swap(i, j int) {
 	items[i], items[j] = items[j], items[i]

@@ -78,6 +78,8 @@ func main() {
 
 	s := receiver.NewReceiver(&chaincfg.TestNet3Params, privKey, bc)
 
+	go s.WatchBlockchainForever()
+
 	ss := &ServerState{privKey, bc, s}
 
 	http.HandleFunc("/", wrap(ss, indexHandler))
