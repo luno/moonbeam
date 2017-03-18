@@ -23,8 +23,9 @@ type SimpleSharedState struct {
 	FundingAmount int64
 	BlockHeight   int
 
-	Balance int64
-	Count   int
+	Balance   int64
+	Count     int
+	SenderSig []byte
 }
 
 const (
@@ -56,6 +57,7 @@ func (ss *SharedState) ToSimple() (*SimpleSharedState, error) {
 		BlockHeight:    ss.BlockHeight,
 		Balance:        ss.Balance,
 		Count:          ss.Count,
+		SenderSig:      ss.SenderSig,
 	}, nil
 }
 
@@ -92,6 +94,7 @@ func FromSimple(s SimpleSharedState) (*SharedState, error) {
 		BlockHeight:    s.BlockHeight,
 		Balance:        s.Balance,
 		Count:          s.Count,
+		SenderSig:      s.SenderSig,
 	}
 	return &ss, nil
 }

@@ -2,7 +2,9 @@ package receiver
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
+	"log"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -14,7 +16,7 @@ import (
 	"moonchan/channels"
 	"moonchan/models"
 	"moonchan/storage"
-	"moonchan/storage/memory"
+	"moonchan/storage/filesystem"
 )
 
 type Receiver struct {
@@ -36,7 +38,7 @@ type Receiver struct {
 }
 
 func NewReceiver(net *chaincfg.Params, privKey *btcec.PrivateKey, bc *btcrpcclient.Client) *Receiver {
-	ms := memory.NewMemoryStorage()
+	ms := filesystem.NewFilesystemStorage("serverdata")
 
 	return &Receiver{
 		Net:     net,
@@ -206,6 +208,8 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("closeTx: %s", hex.EncodeToString(rawTx))
 
 	// FIXME: concurrent access
 	if err := r.db.Update(req.ID, c.State); err != nil {
