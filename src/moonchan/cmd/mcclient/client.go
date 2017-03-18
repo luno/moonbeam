@@ -212,6 +212,25 @@ func refund(args []string) error {
 		return err
 	}
 
+	if sender.State.Status != channels.StatusOpen {
+		txid := args[1]
+		vout, err := strconv.Atoi(args[2])
+		if err != nil {
+			return errors.New("invalid vout")
+		}
+		amount, err := strconv.ParseInt(args[3], 10, 64)
+		if err != nil {
+			return errors.New("invalid amount")
+		}
+		_, err = sender.FundingTxMined(txid, uint32(vout), amount, 0)
+		if err != nil {
+			return err
+		}
+		if err := storeChannel(id, sender); err != nil {
+			return err
+		}
+	}
+
 	rawTx, err := sender.Refund()
 	if err != nil {
 		return err
