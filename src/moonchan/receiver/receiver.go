@@ -166,10 +166,11 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	if conf < 1 {
+	if conf < channels.MinFundingConf {
 		return nil, errors.New("too few confirmations")
 	}
-	if conf > int(c.State.Timeout)/2 {
+	maxConf := c.State.Timeout - channels.CloseWindow
+	if conf > int(maxConf) {
 		return nil, errors.New("too many confirmations")
 	}
 

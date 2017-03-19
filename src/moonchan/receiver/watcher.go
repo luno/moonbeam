@@ -9,15 +9,13 @@ import (
 	"moonchan/storage"
 )
 
-const closeWindow = 140
-
 func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {
 	s := rec.SharedState
 	if s.Status != channels.StatusOpen {
 		return nil
 	}
 
-	cutoff := int64(s.BlockHeight) + s.Timeout - closeWindow
+	cutoff := int64(s.BlockHeight) + s.Timeout - channels.CloseWindow
 
 	if blockCount < cutoff {
 		return nil

@@ -19,7 +19,14 @@ const (
 	StatusClosed          = 5
 )
 
-const defaultTimeout = 3 //144
+const (
+	DefaultTimeout = 144
+	CloseWindow    = 36
+
+	// MinFundingConf is the minimum number of confirmations required before
+	// the funding transaction can be accepted to open a channel.
+	MinFundingConf = 1
+)
 
 type SharedState struct {
 	Version int
@@ -63,7 +70,7 @@ func DefaultState(net *chaincfg.Params) SharedState {
 	return SharedState{
 		Version: 1,
 		Net:     net,
-		Timeout: defaultTimeout,
+		Timeout: DefaultTimeout,
 		Fee:     75000,
 		Status:  StatusNotStarted,
 	}
