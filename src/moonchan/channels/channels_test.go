@@ -248,3 +248,89 @@ func TestInvalidSendSig(t *testing.T) {
 		t.Errorf("Expected error due invalid signature")
 	}
 }
+
+func TestSendDust(t *testing.T) {
+	net, senderWIF, receiverWIF := setUp(t)
+
+	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ss := s.State
+	ss.ReceiverOutput = addr2
+	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+
+	if _, _, err := s.State.GetFundingScript(); err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout       = 1
+		fundAmount = 1000000
+		height     = 100
+	)
+	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Open(txid, vout, fundAmount, height, sig); err != nil {
+		t.Fatal(err)
+	}
+
+	const amount = 100
+
+	sig, err = s.PrepareSend(amount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Send(amount, sig); err == nil {
+		t.Errorf("Expected error due to dust output")
+	}
+}
+
+func TestCapacityTooLow(t *testing.T) {
+	net, senderWIF, receiverWIF := setUp(t)
+
+	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ss := s.State
+	ss.ReceiverOutput = addr2
+	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+
+	if _, _, err := s.State.GetFundingScript(); err != nil {
+		t.Fatal(err)
+	}
+
+	fundAmount := s.State.Fee + dustThreshold - 1
+
+	const (
+		txid   = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout   = 1
+		height = 100
+	)
+	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Open(txid, vout, fundAmount, height, sig); err == nil {
+		t.Errorf("Expected error due to capacity too low")
+	}
+	if r.State.Status != StatusPreInfoGathered {
+		t.Errorf("Wrong status: %s", r.State.Status)
+	}
+}

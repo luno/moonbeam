@@ -176,6 +176,12 @@ func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height i
 }
 
 func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, senderSig []byte) error {
+
+	minCapacity := r.State.Fee + dustThreshold
+	if amount < minCapacity {
+		return errors.New("capacity is too low to open channel")
+	}
+
 	r.State.FundingTxID = txid
 	r.State.FundingVout = vout
 	r.State.FundingAmount = amount

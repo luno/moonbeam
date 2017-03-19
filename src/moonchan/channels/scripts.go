@@ -16,6 +16,8 @@ import (
 // Typical close tx size: 369 bytes
 // Typical refund tx size: 297 bytes
 
+const dustThreshold = 546
+
 func fundingTxScript(senderPubKey, receiverPubKey *btcutil.AddressPubKey, timeout int64) ([]byte, error) {
 	b := txscript.NewScriptBuilder()
 	b.AddOp(txscript.OP_IF)
@@ -235,6 +237,10 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 		return errors.New("tx too big")
 	}
 	for _, txout := range tx.TxOut {
+		if txout.Value < dustThreshold {
+			return errors.New("dust output")
+		}
+
 		sc := txscript.GetScriptClass(txout.PkScript)
 		if sc != txscript.PubKeyHashTy && sc != txscript.ScriptHashTy {
 			return errors.New("unsupported tx out script class")
