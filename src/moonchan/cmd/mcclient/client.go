@@ -31,15 +31,20 @@ func output(req interface{}, resp interface{}, err error) error {
 	return err
 }
 
+var testnet = flag.Bool("testnet", true, "Use testnet")
+var privkey = flag.String("privkey", "cRTgZtoTP8ueH4w7nob5reYTKpFLHvDV9UfUfa67f3SMCaZkGB6L", "WIF private key")
+
 func getNet() *chaincfg.Params {
-	return &chaincfg.TestNet3Params
+	if *testnet {
+		return &chaincfg.TestNet3Params
+	}
+	return &chaincfg.MainNetParams
 }
 
 func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
 	net := getNet()
 
-	const wifstr = "cRTgZtoTP8ueH4w7nob5reYTKpFLHvDV9UfUfa67f3SMCaZkGB6L"
-	wif, err := btcutil.DecodeWIF(wifstr)
+	wif, err := btcutil.DecodeWIF(*privkey)
 	if err != nil {
 		return nil, nil, err
 	}

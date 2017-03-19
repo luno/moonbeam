@@ -13,13 +13,22 @@ import (
 	"moonchan/receiver"
 )
 
-const receiverOutput = "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5"
+var testnet = flag.Bool("testnet", true, "Use testnet")
+var destination = flag.String("destination", "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5", "Destination address")
+var privkey = flag.String("privkey", "cUkJhR6V9Gjrw1enLJ7AHk37Bhtmfk3AyWkRLVhvHGYXSPj3mDLq", "WIF private key")
+var bitcoindHost = flag.String("bitcoind_host", "localhost:18332", "")
+var bitcoindUsername = flag.String("bitcoind_username", "username", "")
+var bitcoindPassword = flag.String("bitcoind_password", "password", "")
 
-func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
-	net := &chaincfg.TestNet3Params
+func getnet() *chaincfg.Params {
+	if *testnet {
+		return &chaincfg.TestNet3Params
+	}
+	return &chaincfg.MainNetParams
+}
 
-	const wifstr = "cUkJhR6V9Gjrw1enLJ7AHk37Bhtmfk3AyWkRLVhvHGYXSPj3mDLq"
-	wif, err := btcutil.DecodeWIF(wifstr)
+func loadkey(net *chaincfg.Params) (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
+	wif, err := btcutil.DecodeWIF(*privkey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -35,9 +44,9 @@ func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
 
 func bitcoinClient() (*btcrpcclient.Client, error) {
 	connCfg := &btcrpcclient.ConnConfig{
-		Host:         "localhost:18332",
-		User:         "username",
-		Pass:         "password",
+		Host:         *bitcoindHost,
+		User:         *bitcoindUsername,
+		Pass:         *bitcoindPassword,
 		HTTPPostMode: true,
 		DisableTLS:   true,
 	}
@@ -67,7 +76,9 @@ func wrap(s *ServerState, h func(*ServerState, http.ResponseWriter, *http.Reques
 func main() {
 	flag.Parse()
 
-	privKey, _, err := loadkey()
+	net := getnet()
+
+	privKey, _, err := loadkey(net)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -78,7 +89,7 @@ func main() {
 	}
 	defer bc.Shutdown()
 
-	s := receiver.NewReceiver(&chaincfg.TestNet3Params, privKey, bc, receiverOutput)
+	s := receiver.NewReceiver(net, privKey, bc, *destination)
 
 	go s.WatchBlockchainForever()
 
