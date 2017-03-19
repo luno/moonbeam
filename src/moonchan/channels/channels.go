@@ -64,7 +64,7 @@ func DefaultState(net *chaincfg.Params) SharedState {
 		Version: 1,
 		Net:     net,
 		Timeout: defaultTimeout,
-		Fee:     5000,
+		Fee:     75000,
 		Status:  StatusNotStarted,
 	}
 }

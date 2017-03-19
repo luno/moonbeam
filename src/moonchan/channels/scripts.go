@@ -13,10 +13,8 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
-const (
-	OP_CHECKLOCKTIMEVERIFY = 177
-	OP_CHECKSEQUENCEVERIFY = 178
-)
+// Typical close tx size: 369 bytes
+// Typical refund tx size: 297 bytes
 
 func fundingTxScript(senderPubKey, receiverPubKey *btcutil.AddressPubKey, timeout int64) ([]byte, error) {
 	b := txscript.NewScriptBuilder()
@@ -28,7 +26,7 @@ func fundingTxScript(senderPubKey, receiverPubKey *btcutil.AddressPubKey, timeou
 	b.AddOp(txscript.OP_CHECKMULTISIG)
 	b.AddOp(txscript.OP_ELSE)
 	b.AddInt64(timeout)
-	b.AddOp(OP_CHECKSEQUENCEVERIFY)
+	b.AddOp(txscript.OP_CHECKSEQUENCEVERIFY)
 	b.AddOp(txscript.OP_DROP)
 	b.AddOp(txscript.OP_DUP)
 	b.AddOp(txscript.OP_HASH160)
