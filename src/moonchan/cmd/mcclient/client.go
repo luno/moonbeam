@@ -57,14 +57,16 @@ func getClient() *client.Client {
 	return client.NewClient(*host)
 }
 
-func create() error {
+func create(args []string) error {
+	outputAddr := args[0]
+
 	privkey, _, err := loadkey()
 	if err != nil {
 		return err
 	}
 	net := getNet()
 
-	s, err := channels.OpenChannel(net, privkey)
+	s, err := channels.OpenChannel(net, privkey, outputAddr)
 	if err != nil {
 		return err
 	}
@@ -72,6 +74,7 @@ func create() error {
 	c := getClient()
 	var req models.CreateRequest
 	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
+	req.SenderOutput = s.State.SenderOutput
 	resp, err := c.Create(req)
 	output(req, resp, err)
 	if err != nil {
@@ -83,7 +86,7 @@ func create() error {
 		return err
 	}
 
-	s.ReceivedPubKey(receiverPubKey)
+	s.ReceivedPubKey(receiverPubKey, resp.ReceiverOutput)
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -270,7 +273,7 @@ func main() {
 	err = errors.New("unknown command")
 	switch action {
 	case "create":
-		err = create()
+		err = create(args)
 	case "fund":
 		err = fund(args)
 	case "send":

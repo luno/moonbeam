@@ -8,6 +8,9 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+const addr1 = "mrreYyaosje7fxCLi3pzknasHiSfziX9GY"
+const addr2 = "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5"
+
 func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 	net := &chaincfg.TestNet3Params
 
@@ -28,17 +31,19 @@ func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 func TestImmediateClose(t *testing.T) {
 	net, senderWIF, receiverWIF := setUp(t)
 
-	s, err := OpenChannel(net, senderWIF.PrivKey)
+	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	ss := s.State
+	ss.ReceiverOutput = addr2
+	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey)
+	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -77,19 +82,19 @@ func TestImmediateClose(t *testing.T) {
 func TestRefund(t *testing.T) {
 	net, senderWIF, receiverWIF := setUp(t)
 
-	s, err := OpenChannel(net, senderWIF.PrivKey)
+	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s.State.Timeout = 1
-
-	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	ss := s.State
+	ss.ReceiverOutput = addr2
+	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey)
+	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -114,22 +119,27 @@ func TestRefund(t *testing.T) {
 	if err := s.State.validateTx(refundTx); err != nil {
 		t.Errorf("validateTx error: %v", err)
 	}
+	if err := r.State.validateTx(refundTx); err != nil {
+		t.Errorf("validateTx error: %v", err)
+	}
 }
 
 func TestSend(t *testing.T) {
 	net, senderWIF, receiverWIF := setUp(t)
 
-	s, err := OpenChannel(net, senderWIF.PrivKey)
+	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	ss := s.State
+	ss.ReceiverOutput = addr2
+	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey)
+	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -192,17 +202,19 @@ func TestSend(t *testing.T) {
 func TestInvalidSendSig(t *testing.T) {
 	net, senderWIF, receiverWIF := setUp(t)
 
-	s, err := OpenChannel(net, senderWIF.PrivKey)
+	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := AcceptChannel(s.State, receiverWIF.PrivKey)
+	ss := s.State
+	ss.ReceiverOutput = addr2
+	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey)
+	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
 
 	if _, _, err := s.State.GetFundingScript(); err != nil {
 		t.Fatal(err)

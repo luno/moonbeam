@@ -32,6 +32,9 @@ type SharedState struct {
 	SenderPubKey   *btcutil.AddressPubKey
 	ReceiverPubKey *btcutil.AddressPubKey
 
+	SenderOutput   string
+	ReceiverOutput string
+
 	FundingTxID   string
 	FundingVout   uint32
 	FundingAmount int64
@@ -66,6 +69,26 @@ func DefaultState(net *chaincfg.Params) SharedState {
 	}
 }
 
+func checkSupportedAddress(net *chaincfg.Params, addr string) error {
+	a, err := btcutil.DecodeAddress(addr, net)
+	if err != nil {
+		return err
+	}
+
+	if !a.IsForNet(net) {
+		return errors.New("wrong net")
+	}
+
+	if _, ok := a.(*btcutil.AddressPubKeyHash); ok {
+		return nil
+	}
+	if _, ok := a.(*btcutil.AddressScriptHash); ok {
+		return nil
+	}
+
+	return errors.New("unsupported output type")
+}
+
 type Sender struct {
 	State   SharedState
 	PrivKey *btcec.PrivateKey
@@ -80,7 +103,11 @@ func derivePubKey(privKey *btcec.PrivateKey, net *chaincfg.Params) (*btcutil.Add
 	return btcutil.NewAddressPubKey(pk.SerializeCompressed(), net)
 }
 
-func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey) (*Sender, error) {
+func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey, outputAddr string) (*Sender, error) {
+	if err := checkSupportedAddress(net, outputAddr); err != nil {
+		return nil, err
+	}
+
 	pubKey, err := derivePubKey(privKey, net)
 	if err != nil {
 		return nil, err
@@ -88,6 +115,7 @@ func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey) (*Sender, erro
 
 	ss := DefaultState(net)
 	ss.SenderPubKey = pubKey
+	ss.SenderOutput = outputAddr
 
 	c := Sender{
 		State:   ss,
@@ -96,14 +124,20 @@ func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey) (*Sender, erro
 	return &c, nil
 }
 
-func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey) {
+func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey, receiverOutput string) error {
+	if err := checkSupportedAddress(s.State.Net, receiverOutput); err != nil {
+		return err
+	}
+
 	s.State.ReceiverPubKey = pubKey
+	s.State.ReceiverOutput = receiverOutput
+
+	return nil
 }
 
 type Receiver struct {
 	State   SharedState
 	PrivKey *btcec.PrivateKey
-	//SenderSig []byte
 }
 
 func NewReceiver(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error) {
@@ -111,6 +145,10 @@ func NewReceiver(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error
 }
 
 func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error) {
+	if err := checkSupportedAddress(state.Net, state.SenderOutput); err != nil {
+		return nil, err
+	}
+
 	pubKey, err := derivePubKey(privKey, state.Net)
 	if err != nil {
 		return nil, err

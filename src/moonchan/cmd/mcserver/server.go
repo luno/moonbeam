@@ -13,6 +13,8 @@ import (
 	"moonchan/receiver"
 )
 
+const receiverOutput = "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5"
+
 func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
 	net := &chaincfg.TestNet3Params
 
@@ -76,7 +78,7 @@ func main() {
 	}
 	defer bc.Shutdown()
 
-	s := receiver.NewReceiver(&chaincfg.TestNet3Params, privKey, bc)
+	s := receiver.NewReceiver(&chaincfg.TestNet3Params, privKey, bc, receiverOutput)
 
 	go s.WatchBlockchainForever()
 

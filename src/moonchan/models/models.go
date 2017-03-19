@@ -2,12 +2,14 @@ package models
 
 type CreateRequest struct {
 	SenderPubKey []byte
+	SenderOutput string
 }
 
 type CreateResponse struct {
 	ID string
 
 	ReceiverPubKey []byte
+	ReceiverOutput string
 
 	FundingAddress string
 }

@@ -20,20 +20,22 @@ import (
 )
 
 type Receiver struct {
-	Net     *chaincfg.Params
-	privKey *btcec.PrivateKey
-	bc      *btcrpcclient.Client
-	db      storage.Storage
+	Net            *chaincfg.Params
+	privKey        *btcec.PrivateKey
+	bc             *btcrpcclient.Client
+	db             storage.Storage
+	receiverOutput string
 }
 
-func NewReceiver(net *chaincfg.Params, privKey *btcec.PrivateKey, bc *btcrpcclient.Client) *Receiver {
+func NewReceiver(net *chaincfg.Params, privKey *btcec.PrivateKey, bc *btcrpcclient.Client, destination string) *Receiver {
 	ms := filesystem.NewFilesystemStorage("serverdata")
 
 	return &Receiver{
-		Net:     net,
-		privKey: privKey,
-		bc:      bc,
-		db:      ms,
+		Net:            net,
+		privKey:        privKey,
+		bc:             bc,
+		db:             ms,
+		receiverOutput: destination,
 	}
 }
 
@@ -60,6 +62,8 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 
 	ss := channels.DefaultState(r.Net)
 	ss.SenderPubKey = senderPubKey
+	ss.SenderOutput = req.SenderOutput
+	ss.ReceiverOutput = r.receiverOutput
 
 	c, err := channels.AcceptChannel(ss, r.privKey)
 	if err != nil {
@@ -81,6 +85,7 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 	resp := models.CreateResponse{
 		ID:             id,
 		ReceiverPubKey: receiverPubKey,
+		ReceiverOutput: ss.ReceiverOutput,
 		FundingAddress: addr,
 	}
 	return &resp, nil

@@ -5,7 +5,9 @@ import (
 	"errors"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -68,11 +70,17 @@ func (s *SharedState) spendFundingTx() (*wire.MsgTx, error) {
 	return tx, nil
 }
 
-func sendToAddress(amount int64, addr *btcutil.AddressPubKey) (*wire.TxOut, error) {
-	pkscript, err := txscript.PayToAddrScript(addr.AddressPubKeyHash())
+func sendToAddress(net *chaincfg.Params, amount int64, addr string) (*wire.TxOut, error) {
+	address, err := btcutil.DecodeAddress(addr, net)
 	if err != nil {
 		return nil, err
 	}
+
+	pkscript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return nil, err
+	}
+
 	return &wire.TxOut{
 		Value:    amount,
 		PkScript: pkscript,
@@ -91,7 +99,7 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	}
 
 	if receiveAmount > 0 {
-		txout, err := sendToAddress(receiveAmount, s.ReceiverPubKey)
+		txout, err := sendToAddress(s.Net, receiveAmount, s.ReceiverOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +107,7 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	}
 
 	if senderAmount > 0 {
-		txout, err := sendToAddress(senderAmount, s.SenderPubKey)
+		txout, err := sendToAddress(s.Net, senderAmount, s.SenderOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +162,7 @@ func (s *SharedState) GetRefundTxSigned(privKey *btcec.PrivateKey) ([]byte, erro
 	}
 
 	amount := s.FundingAmount - s.Fee
-	txout, err := sendToAddress(amount, s.SenderPubKey)
+	txout, err := sendToAddress(s.Net, amount, s.SenderOutput)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +228,20 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 	if err != nil {
 		return err
 	}
+	if err := engine.Execute(); err != nil {
+		return err
+	}
 
-	return engine.Execute()
+	// The transaction must be "standard" otherwise it won't be relayed.
+	if len(rawTx) >= mempool.MaxStandardTxSize {
+		return errors.New("tx too big")
+	}
+	for _, txout := range tx.TxOut {
+		sc := txscript.GetScriptClass(txout.PkScript)
+		if sc != txscript.PubKeyHashTy && sc != txscript.ScriptHashTy {
+			return errors.New("unsupported tx out script class")
+		}
+	}
+
+	return nil
 }
