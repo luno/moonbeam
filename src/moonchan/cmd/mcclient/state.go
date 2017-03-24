@@ -7,24 +7,59 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcutil/hdkeychain"
+
 	"moonchan/channels"
 )
 
+type Channel struct {
+	Host    string
+	State   channels.SimpleSharedState
+	KeyPath int
+}
+
 type State struct {
-	Channels map[string]channels.SimpleSharedState
+	Seed           []byte
+	XPrivKey       string
+	KeyPathCounter int
+	Channels       map[string]Channel
 }
 
-func newState() *State {
-	return &State{
-		Channels: make(map[string]channels.SimpleSharedState),
+func (s *State) NextKey() int {
+	c := s.KeyPathCounter
+	s.KeyPathCounter++
+	return c
+}
+
+func newState(net *chaincfg.Params) (*State, error) {
+	seed, err := hdkeychain.GenerateSeed(hdkeychain.RecommendedSeedLen)
+	if err != nil {
+		return nil, err
 	}
+	key, err := hdkeychain.NewMaster(seed, net)
+	if err != nil {
+		return nil, err
+	}
+
+	return &State{
+		Seed:     seed,
+		XPrivKey: key.String(),
+		Channels: make(map[string]Channel),
+	}, nil
 }
 
-const name = "client-state.json"
+func getFilename(net *chaincfg.Params) string {
+	if net == &chaincfg.TestNet3Params {
+		return "client-state.testnet3.json"
+	}
+	return "client-state.mainnet.json"
+}
 
-func save(s *State) error {
+func save(net *chaincfg.Params, s *State) error {
 	suffix := strconv.FormatInt(time.Now().Unix(), 10)
 
+	name := getFilename(net)
 	tmpName := name + ".tmp." + suffix
 
 	f, err := os.Create(tmpName)
@@ -44,10 +79,22 @@ func save(s *State) error {
 	return os.Rename(tmpName, name)
 }
 
-func load() (*State, error) {
+func createNew(net *chaincfg.Params) (*State, error) {
+	s, err := newState(net)
+	if err != nil {
+		return nil, err
+	}
+	if err := save(net, s); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func load(net *chaincfg.Params) (*State, error) {
+	name := getFilename(net)
 	f, err := os.Open(name)
 	if os.IsNotExist(err) {
-		return newState(), nil
+		return createNew(net)
 	} else if err != nil {
 		return nil, err
 	}
@@ -68,12 +115,12 @@ func getChannel(id string) (*channels.Sender, error) {
 	if !ok {
 		return nil, errors.New("unknown id")
 	}
-	ss, err := channels.FromSimple(s)
+	ss, err := channels.FromSimple(s.State)
 	if err != nil {
 		return nil, err
 	}
 
-	privkey, _, err := loadkey()
+	privkey, _, err := loadkey(globalState, s.KeyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +133,15 @@ func getChannel(id string) (*channels.Sender, error) {
 	return sender, nil
 }
 
-func storeChannel(id string, sender *channels.Sender) error {
-	newState, err := sender.State.ToSimple()
+func storeChannel(id string, state channels.SharedState) error {
+	newState, err := state.ToSimple()
 	if err != nil {
 		return err
 	}
-	globalState.Channels[id] = *newState
+	c, ok := globalState.Channels[id]
+	if !ok {
+		return errors.New("channel does not exist")
+	}
+	c.State = *newState
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/hdkeychain"
 
 	"moonchan/channels"
 	"moonchan/client"
@@ -32,7 +33,6 @@ func output(req interface{}, resp interface{}, err error) error {
 }
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
-var privkey = flag.String("privkey", "cRTgZtoTP8ueH4w7nob5reYTKpFLHvDV9UfUfa67f3SMCaZkGB6L", "WIF private key")
 
 func getNet() *chaincfg.Params {
 	if *testnet {
@@ -41,21 +41,34 @@ func getNet() *chaincfg.Params {
 	return &chaincfg.MainNetParams
 }
 
-func loadkey() (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
+func loadkey(s *State, n int) (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
 	net := getNet()
 
-	wif, err := btcutil.DecodeWIF(*privkey)
+	ek, err := hdkeychain.NewKeyFromString(s.XPrivKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !ek.IsForNet(net) {
+		return nil, nil, errors.New("wrong network")
+	}
+
+	ek, err = ek.Child(uint32(n))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pk := (*btcec.PublicKey)(&wif.PrivKey.PublicKey)
+	privKey, err := ek.ECPrivKey()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pk := (*btcec.PublicKey)(&privKey.PublicKey)
 	pubkey, err := btcutil.NewAddressPubKey(pk.SerializeCompressed(), net)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return wif.PrivKey, pubkey, nil
+	return privKey, pubkey, nil
 }
 
 func getClient() *client.Client {
@@ -65,12 +78,13 @@ func getClient() *client.Client {
 func create(args []string) error {
 	outputAddr := args[0]
 
-	privkey, _, err := loadkey()
+	n := globalState.NextKey()
+	privkey, _, err := loadkey(globalState, n)
 	if err != nil {
 		return err
 	}
-	net := getNet()
 
+	net := getNet()
 	s, err := channels.OpenChannel(net, privkey, outputAddr)
 	if err != nil {
 		return err
@@ -113,7 +127,11 @@ func create(args []string) error {
 		return err
 	}
 
-	globalState.Channels[resp.ID] = *ss
+	globalState.Channels[resp.ID] = Channel{
+		Host:    *host,
+		State:   *ss,
+		KeyPath: n,
+	}
 
 	return nil
 }
@@ -154,7 +172,7 @@ func fund(args []string) error {
 		return err
 	}
 
-	return storeChannel(id, sender)
+	return storeChannel(id, sender.State)
 }
 
 func send(args []string) error {
@@ -190,7 +208,7 @@ func send(args []string) error {
 		return err
 	}
 
-	return storeChannel(id, sender)
+	return storeChannel(id, sender.State)
 }
 
 func closeAction(args []string) error {
@@ -213,7 +231,7 @@ func closeAction(args []string) error {
 
 	fmt.Printf("%s\n", hex.EncodeToString(resp.CloseTx))
 
-	return storeChannel(id, sender)
+	return storeChannel(id, sender.State)
 }
 
 func refund(args []string) error {
@@ -238,7 +256,7 @@ func refund(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := storeChannel(id, sender); err != nil {
+		if err := storeChannel(id, sender.State); err != nil {
 			return err
 		}
 	}
@@ -269,7 +287,9 @@ func main() {
 	action := args[0]
 	args = args[1:]
 
-	s, err := load()
+	net := getNet()
+
+	s, err := load(net)
 	if err != nil {
 		outputError(err.Error())
 	}
@@ -289,7 +309,7 @@ func main() {
 		err = refund(args)
 	}
 	if err == nil {
-		err = save(globalState)
+		err = save(net, globalState)
 	}
 	if err != nil {
 		outputError(err.Error())
