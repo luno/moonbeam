@@ -17,6 +17,7 @@ import (
 	"moonchan/channels"
 	"moonchan/client"
 	"moonchan/models"
+	"moonchan/resolver"
 )
 
 func output(req interface{}, resp interface{}, err error) error {
@@ -75,8 +76,14 @@ func getClient(id string) *client.Client {
 }
 
 func create(args []string) error {
-	host := args[0]
+	domain := args[0]
 	outputAddr := args[1]
+
+	hostURL, err := resolver.Resolve(domain)
+	if err != nil {
+		return err
+	}
+	host := hostURL.String()
 
 	n := globalState.NextKey()
 	privkey, _, err := loadkey(globalState, n)
@@ -129,6 +136,7 @@ func create(args []string) error {
 
 	id := strconv.Itoa(n)
 	globalState.Channels[id] = Channel{
+		Domain:   domain,
 		Host:     host,
 		State:    *ss,
 		KeyPath:  n,
@@ -180,10 +188,26 @@ func fund(args []string) error {
 }
 
 func send(args []string) error {
-	id := args[0]
+	target := args[0]
 	amount, err := strconv.ParseInt(args[1], 10, 64)
 	if err != nil {
 		return errors.New("invalid amount")
+	}
+	id := ""
+	if len(args) > 2 {
+		id = args[2]
+	}
+
+	if id == "" {
+		_, domain, err := resolver.ParseAddress(target)
+		if err != nil {
+			return err
+		}
+		ids := findForDomain(domain)
+		if len(ids) == 0 {
+			return errors.New("no open channels to domain")
+		}
+		id = ids[0]
 	}
 
 	ch, sender, err := getChannel(id)
@@ -276,12 +300,12 @@ func refund(args []string) error {
 }
 
 func list(args []string) error {
-	fmt.Printf("ID\tHost\tStatus\tCapacity\tBalance\n")
+	fmt.Printf("ID\tDomain\tStatus\tCapacity\tBalance\n")
 	for id, c := range globalState.Channels {
 		total := float64(c.State.FundingAmount) / 1e8
 		balance := float64(c.State.Balance) / 1e8
 		fmt.Printf("%s\t%s\t%s\t%.8f\t%.8f\n",
-			id, c.Host, c.State.Status, total, balance)
+			id, c.Domain, c.State.Status, total, balance)
 	}
 	return nil
 }

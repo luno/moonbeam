@@ -14,6 +14,7 @@ import (
 )
 
 type Channel struct {
+	Domain   string
 	Host     string
 	State    channels.SimpleSharedState
 	KeyPath  int
@@ -146,4 +147,14 @@ func storeChannel(id string, state channels.SharedState) error {
 	c.State = *newState
 	globalState.Channels[id] = c
 	return nil
+}
+
+func findForDomain(domain string) []string {
+	var ids []string
+	for id, c := range globalState.Channels {
+		if c.Domain == domain && c.State.Status == channels.StatusOpen {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
