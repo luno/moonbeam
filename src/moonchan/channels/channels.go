@@ -19,6 +19,23 @@ const (
 	StatusClosed          = 5
 )
 
+func (s Status) String() string {
+	switch s {
+	case StatusNotStarted:
+		return "NOT_STARTED"
+	case StatusPreInfoGathered:
+		return "PRE_INFO_GATHERED"
+	case StatusOpen:
+		return "OPEN"
+	case StatusClosing:
+		return "CLOSING"
+	case StatusClosed:
+		return "CLOSED"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 const (
 	DefaultTimeout = 144
 	CloseWindow    = 36

@@ -274,6 +274,17 @@ func refund(args []string) error {
 	return nil
 }
 
+func list(args []string) error {
+	fmt.Printf("ID\tHost\tStatus\tCapacity\tBalance\n")
+	for id, c := range globalState.Channels {
+		total := float64(c.State.FundingAmount) / 1e8
+		balance := float64(c.State.Balance) / 1e8
+		fmt.Printf("%s\t%s\t%s\t%.8f\t%.8f\n",
+			id, c.Host, c.State.Status, total, balance)
+	}
+	return nil
+}
+
 func outputError(err string) {
 	fmt.Printf("%v\n", err)
 	os.Exit(1)
@@ -310,6 +321,8 @@ func main() {
 		err = closeAction(args)
 	case "refund":
 		err = refund(args)
+	case "list":
+		err = list(args)
 	}
 	if err == nil {
 		err = save(net, globalState)
