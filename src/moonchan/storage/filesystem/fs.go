@@ -143,8 +143,13 @@ func (fs *FilesystemStorage) Create(id int, s channels.SharedState) error {
 	return fs.save(d)
 }
 
-func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
-	sss, err := s.ToSimple()
+func checkSame(d *data, id int, prev channels.SharedState) bool {
+	s := d.Channels[id]
+	return s.Status == prev.Status && s.Count == prev.Count
+}
+
+func (fs *FilesystemStorage) Update(id int, prev, new channels.SharedState) error {
+	sss, err := new.ToSimple()
 	if err != nil {
 		return err
 	}
@@ -159,6 +164,10 @@ func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
 
 	if _, ok := d.Channels[id]; !ok {
 		return storage.ErrNotFound
+	}
+
+	if !checkSame(d, id, prev) {
+		return storage.ErrConcurrentUpdate
 	}
 
 	d.Channels[id] = *sss
@@ -166,8 +175,8 @@ func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
 	return fs.save(d)
 }
 
-func (fs *FilesystemStorage) Send(id int, s channels.SharedState, p storage.Payment) error {
-	sss, err := s.ToSimple()
+func (fs *FilesystemStorage) Send(id int, prev, new channels.SharedState, p storage.Payment) error {
+	sss, err := new.ToSimple()
 	if err != nil {
 		return err
 	}
@@ -182,6 +191,10 @@ func (fs *FilesystemStorage) Send(id int, s channels.SharedState, p storage.Paym
 
 	if _, ok := d.Channels[id]; !ok {
 		return storage.ErrNotFound
+	}
+
+	if !checkSame(d, id, prev) {
+		return storage.ErrConcurrentUpdate
 	}
 
 	d.Channels[id] = *sss

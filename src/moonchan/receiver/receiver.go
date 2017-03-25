@@ -192,6 +192,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	prev := c.State
 
 	_, addr, err := c.State.GetFundingScript()
 	if err != nil {
@@ -221,8 +222,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	// FIXME: concurrent access
-	if err := r.db.Update(nid, c.State); err != nil {
+	if err := r.db.Update(nid, prev, c.State); err != nil {
 		return nil, err
 	}
 
@@ -234,6 +234,7 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	prev := c.State
 
 	if err := c.Send(req.Amount, req.SenderSig); err != nil {
 		return nil, err
@@ -244,8 +245,7 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		Amount: req.Amount,
 	}
 
-	// FIXME: concurrent access
-	if err := r.db.Send(nid, c.State, p); err != nil {
+	if err := r.db.Send(nid, prev, c.State, p); err != nil {
 		return nil, err
 	}
 
@@ -257,6 +257,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 	if err != nil {
 		return nil, err
 	}
+	prev := c.State
 
 	rawTx, err := c.Close()
 	if err != nil {
@@ -265,8 +266,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	log.Printf("closeTx: %s", hex.EncodeToString(rawTx))
 
-	// FIXME: concurrent access
-	if err := r.db.Update(nid, c.State); err != nil {
+	if err := r.db.Update(nid, prev, c.State); err != nil {
 		return nil, err
 	}
 
