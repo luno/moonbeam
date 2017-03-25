@@ -19,8 +19,6 @@ import (
 	"moonchan/models"
 )
 
-var host = flag.String("host", "http://127.0.0.1:3211", "Server host")
-
 func output(req interface{}, resp interface{}, err error) error {
 	if err != nil {
 		buf, _ := json.MarshalIndent(req, "", "    ")
@@ -71,12 +69,14 @@ func loadkey(s *State, n int) (*btcec.PrivateKey, *btcutil.AddressPubKey, error)
 	return privKey, pubkey, nil
 }
 
-func getClient() *client.Client {
-	return client.NewClient(*host)
+func getClient(id string) *client.Client {
+	host := globalState.Channels[id].Host
+	return client.NewClient(host)
 }
 
 func create(args []string) error {
-	outputAddr := args[0]
+	host := args[0]
+	outputAddr := args[1]
 
 	n := globalState.NextKey()
 	privkey, _, err := loadkey(globalState, n)
@@ -90,7 +90,7 @@ func create(args []string) error {
 		return err
 	}
 
-	c := getClient()
+	c := client.NewClient(host)
 	var req models.CreateRequest
 	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
 	req.SenderOutput = s.State.SenderOutput
@@ -127,11 +127,14 @@ func create(args []string) error {
 		return err
 	}
 
-	globalState.Channels[resp.ID] = Channel{
-		Host:    *host,
+	id := strconv.Itoa(n)
+	globalState.Channels[id] = Channel{
+		Host:    host,
 		State:   *ss,
 		KeyPath: n,
 	}
+
+	fmt.Printf("%s\n", id)
 
 	return nil
 }
@@ -159,7 +162,7 @@ func fund(args []string) error {
 		return err
 	}
 
-	c := getClient()
+	c := getClient(id)
 	req := models.OpenRequest{
 		ID:        id,
 		TxID:      txid,
@@ -192,7 +195,7 @@ func send(args []string) error {
 		return err
 	}
 
-	c := getClient()
+	c := getClient(id)
 	req := models.SendRequest{
 		ID:        id,
 		Amount:    amount,
@@ -219,7 +222,7 @@ func closeAction(args []string) error {
 		return err
 	}
 
-	c := getClient()
+	c := getClient(id)
 	req := models.CloseRequest{
 		ID: id,
 	}
