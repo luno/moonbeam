@@ -285,6 +285,17 @@ func list(args []string) error {
 	return nil
 }
 
+func show(args []string) error {
+	id := args[0]
+	c, ok := globalState.Channels[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	buf, _ := json.MarshalIndent(c, "", "    ")
+	fmt.Printf("%s\n", string(buf))
+	return nil
+}
+
 func outputError(err string) {
 	fmt.Printf("%v\n", err)
 	os.Exit(1)
@@ -323,6 +334,8 @@ func main() {
 		err = refund(args)
 	case "list":
 		err = list(args)
+	case "show":
+		err = show(args)
 	}
 	if err == nil {
 		err = save(net, globalState)
