@@ -1,21 +1,21 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"net/http"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/hdkeychain"
 
 	"moonchan/receiver"
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
 var destination = flag.String("destination", "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5", "Destination address")
-var privkey = flag.String("privkey", "cUkJhR6V9Gjrw1enLJ7AHk37Bhtmfk3AyWkRLVhvHGYXSPj3mDLq", "WIF private key")
+var xprivkey = flag.String("privkey", "tprv8ZgxMBicQKsPe4s4h67jp6E3zhvfLRU6gnfrHRiwdfL3dR6AWJCw8sCiiGDVM4Nvw3muHfsdfbWVZwDi5TdiwiHrfYDXxGrfRFoYtdF2vnb", "Key chain extended private key")
 var bitcoindHost = flag.String("bitcoind_host", "localhost:18332", "")
 var bitcoindUsername = flag.String("bitcoind_username", "username", "")
 var bitcoindPassword = flag.String("bitcoind_password", "password", "")
@@ -27,19 +27,17 @@ func getnet() *chaincfg.Params {
 	return &chaincfg.MainNetParams
 }
 
-func loadkey(net *chaincfg.Params) (*btcec.PrivateKey, *btcutil.AddressPubKey, error) {
-	wif, err := btcutil.DecodeWIF(*privkey)
+func loadkey(net *chaincfg.Params) (*hdkeychain.ExtendedKey, error) {
+	ek, err := hdkeychain.NewKeyFromString(*xprivkey)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	pk := (*btcec.PublicKey)(&wif.PrivKey.PublicKey)
-	pubkey, err := btcutil.NewAddressPubKey(pk.SerializeCompressed(), net)
-	if err != nil {
-		return nil, nil, err
+	if !ek.IsForNet(net) {
+		return nil, errors.New("xprivkey is for wrong network")
 	}
 
-	return wif.PrivKey, pubkey, nil
+	return ek, nil
 }
 
 func bitcoinClient() (*btcrpcclient.Client, error) {
@@ -62,7 +60,6 @@ func bitcoinClient() (*btcrpcclient.Client, error) {
 }
 
 type ServerState struct {
-	PrivKey  *btcec.PrivateKey
 	BC       *btcrpcclient.Client
 	Receiver *receiver.Receiver
 }
@@ -78,7 +75,7 @@ func main() {
 
 	net := getnet()
 
-	privKey, _, err := loadkey(net)
+	ek, err := loadkey(net)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,11 +86,11 @@ func main() {
 	}
 	defer bc.Shutdown()
 
-	s := receiver.NewReceiver(net, privKey, bc, *destination)
+	s := receiver.NewReceiver(net, ek, bc, *destination)
 
 	go s.WatchBlockchainForever()
 
-	ss := &ServerState{privKey, bc, s}
+	ss := &ServerState{bc, s}
 
 	http.HandleFunc("/", wrap(ss, indexHandler))
 	http.HandleFunc("/details", wrap(ss, detailsHandler))

@@ -9,13 +9,15 @@ import (
 var ErrNotFound = errors.New("record not found")
 
 type Record struct {
-	ID          string
+	ID          int
 	SharedState channels.SharedState
 }
 
 type Storage interface {
-	Get(id string) (*Record, error)
+	Get(id int) (*Record, error)
 	List() ([]Record, error)
-	Create(s channels.SharedState) (string, error)
-	Update(id string, s channels.SharedState) error
+	Create(id int, s channels.SharedState) error
+	Update(id int, s channels.SharedState) error
+
+	ReserveKeyPath() (int, error)
 }

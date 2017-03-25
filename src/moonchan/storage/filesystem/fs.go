@@ -2,7 +2,6 @@ package filesystem
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +11,10 @@ import (
 	"moonchan/channels"
 	"moonchan/storage"
 )
+
+type metaInfo struct {
+	KeyPathCounter int
+}
 
 type FilesystemStorage struct {
 	mu  sync.RWMutex
@@ -24,30 +27,18 @@ func NewFilesystemStorage(dir string) *FilesystemStorage {
 	}
 }
 
-func (fs *FilesystemStorage) getPath(id string) (string, error) {
-	if len(id) == 0 || len(id) > 100 {
-		return "", errors.New("invalid id")
-	}
-
-	i, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return "", err
-	}
-
-	s := strconv.FormatInt(i, 10)
-	if s != id {
-		return "", errors.New("invalid id")
-	}
-
-	return fs.dir + "/" + id + ".json", nil
+func (fs *FilesystemStorage) getPath(id int) (string, error) {
+	s := strconv.Itoa(id)
+	return fs.dir + "/" + s + ".json", nil
 }
 
-func (fs *FilesystemStorage) getIdFromPath(path string) (string, error) {
+func (fs *FilesystemStorage) getIdFromPath(path string) (int, error) {
 	path = strings.TrimPrefix(path, fs.dir+"/")
-	return strings.TrimSuffix(path, ".json"), nil
+	path = strings.TrimSuffix(path, ".json")
+	return strconv.Atoi(path)
 }
 
-func (fs *FilesystemStorage) Get(id string) (*storage.Record, error) {
+func (fs *FilesystemStorage) Get(id int) (*storage.Record, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 
@@ -93,7 +84,7 @@ func (fs *FilesystemStorage) List() ([]storage.Record, error) {
 	for _, path := range paths {
 		id, err := fs.getIdFromPath(path)
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		r, err := fs.Get(id)
@@ -114,41 +105,34 @@ func (fs *FilesystemStorage) count() (int64, error) {
 	return int64(len(paths)), nil
 }
 
-func (fs *FilesystemStorage) Create(s channels.SharedState) (string, error) {
+func (fs *FilesystemStorage) Create(id int, s channels.SharedState) error {
 	sss, err := s.ToSimple()
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	n, err := fs.count()
-	if err != nil {
-		return "", err
-	}
-	n++
-	id := strconv.FormatInt(n, 10)
-
 	path, err := fs.getPath(id)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if err := json.NewEncoder(f).Encode(sss); err != nil {
 		f.Close()
-		return "", err
+		return err
 	}
 
-	return id, f.Close()
+	return f.Close()
 }
 
-func (fs *FilesystemStorage) Update(id string, s channels.SharedState) error {
+func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
 	sss, err := s.ToSimple()
 	if err != nil {
 		return err
@@ -173,6 +157,54 @@ func (fs *FilesystemStorage) Update(id string, s channels.SharedState) error {
 	}
 
 	return f.Close()
+}
+
+func loadOrZero(path string) (*metaInfo, error) {
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return &metaInfo{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var mi metaInfo
+	if err := json.NewDecoder(f).Decode(&mi); err != nil {
+		return nil, err
+	}
+
+	return &mi, nil
+}
+
+func (fs *FilesystemStorage) ReserveKeyPath() (int, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	path := fs.dir + "/metainfo.json"
+
+	mi, err := loadOrZero(path)
+	if err != nil {
+		return 0, err
+	}
+
+	mi.KeyPathCounter++
+
+	tmp := path + ".tmp"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	if err := json.NewEncoder(f).Encode(mi); err != nil {
+		return 0, err
+	}
+
+	if err := f.Close(); err != nil {
+		return 0, err
+	}
+
+	return mi.KeyPathCounter, os.Rename(tmp, path)
 }
 
 // Make sure FilesystemStorage implements Storage.
