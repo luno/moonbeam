@@ -286,6 +286,10 @@ func closeAction(args []string) error {
 		return err
 	}
 
+	if err := sender.CloseReceived(resp.CloseTx); err != nil {
+		return err
+	}
+
 	fmt.Printf("%s\n", hex.EncodeToString(resp.CloseTx))
 
 	return storeChannel(id, sender.State)

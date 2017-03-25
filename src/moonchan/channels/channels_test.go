@@ -75,6 +75,10 @@ func TestImmediateClose(t *testing.T) {
 		t.Errorf("validateTx error: %v", err)
 	}
 
+	if err := s.CloseReceived(closeTx); err != nil {
+		t.Fatal(err)
+	}
+
 	s.CloseMined()
 	r.CloseMined()
 }
@@ -193,6 +197,10 @@ func TestSend(t *testing.T) {
 
 	if err := s.State.validateTx(closeTx); err != nil {
 		t.Errorf("validateTx error: %v", err)
+	}
+
+	if err := s.CloseReceived(closeTx); err != nil {
+		t.Fatal(err)
 	}
 
 	s.CloseMined()

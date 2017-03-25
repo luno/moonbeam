@@ -304,6 +304,19 @@ func (r *Receiver) Close() ([]byte, error) {
 	return rawTx, err
 }
 
+func (s *Sender) CloseReceived(rawTx []byte) error {
+	if s.State.Status != StatusOpen && s.State.Status != StatusClosing {
+		return errors.New("cannot close channel that isn't open")
+	}
+
+	if err := s.State.validateTx(rawTx); err != nil {
+		return err
+	}
+
+	s.State.Status = StatusClosing
+	return nil
+}
+
 func (s *Sender) CloseMined() {
 	s.State.Status = StatusClosed
 }
