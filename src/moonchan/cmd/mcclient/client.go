@@ -329,8 +329,16 @@ func refund(args []string) error {
 }
 
 func list(args []string) error {
+	all := false
+	if len(args) > 0 && args[0] == "-a" {
+		all = true
+	}
+
 	fmt.Printf("ID\tDomain\tStatus\tCapacity\tBalance\n")
 	for id, c := range globalState.Channels {
+		if c.State.Status != channels.StatusOpen && !all {
+			continue
+		}
 		total := float64(c.State.FundingAmount) / 1e8
 		balance := float64(c.State.Balance) / 1e8
 		fmt.Printf("%s\t%s\t%s\t%.8f\t%.8f\n",
