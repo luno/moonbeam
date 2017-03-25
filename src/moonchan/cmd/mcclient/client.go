@@ -129,9 +129,10 @@ func create(args []string) error {
 
 	id := strconv.Itoa(n)
 	globalState.Channels[id] = Channel{
-		Host:    host,
-		State:   *ss,
-		KeyPath: n,
+		Host:     host,
+		State:    *ss,
+		KeyPath:  n,
+		RemoteID: resp.ID,
 	}
 
 	fmt.Printf("%s\n", id)
@@ -152,7 +153,7 @@ func fund(args []string) error {
 	}
 	height := 0
 
-	sender, err := getChannel(id)
+	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -164,7 +165,7 @@ func fund(args []string) error {
 
 	c := getClient(id)
 	req := models.OpenRequest{
-		ID:        id,
+		ID:        ch.RemoteID,
 		TxID:      txid,
 		Vout:      uint32(vout),
 		SenderSig: sig,
@@ -185,7 +186,7 @@ func send(args []string) error {
 		return errors.New("invalid amount")
 	}
 
-	sender, err := getChannel(id)
+	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -197,7 +198,7 @@ func send(args []string) error {
 
 	c := getClient(id)
 	req := models.SendRequest{
-		ID:        id,
+		ID:        ch.RemoteID,
 		Amount:    amount,
 		SenderSig: sig,
 	}
@@ -217,14 +218,14 @@ func send(args []string) error {
 func closeAction(args []string) error {
 	id := args[0]
 
-	sender, err := getChannel(id)
+	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
 
 	c := getClient(id)
 	req := models.CloseRequest{
-		ID: id,
+		ID: ch.RemoteID,
 	}
 	resp, err := c.Close(req)
 	output(req, resp, err)
@@ -240,7 +241,7 @@ func closeAction(args []string) error {
 func refund(args []string) error {
 	id := args[0]
 
-	sender, err := getChannel(id)
+	_, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}

@@ -14,9 +14,10 @@ import (
 )
 
 type Channel struct {
-	Host    string
-	State   channels.SimpleSharedState
-	KeyPath int
+	Host     string
+	State    channels.SimpleSharedState
+	KeyPath  int
+	RemoteID string
 }
 
 type State struct {
@@ -110,27 +111,27 @@ func load(net *chaincfg.Params) (*State, error) {
 
 var globalState *State
 
-func getChannel(id string) (*channels.Sender, error) {
+func getChannel(id string) (*Channel, *channels.Sender, error) {
 	s, ok := globalState.Channels[id]
 	if !ok {
-		return nil, errors.New("unknown id")
+		return nil, nil, errors.New("unknown id")
 	}
 	ss, err := channels.FromSimple(s.State)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	privkey, _, err := loadkey(globalState, s.KeyPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	sender, err := channels.NewSender(*ss, privkey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return sender, nil
+	return &s, sender, nil
 }
 
 func storeChannel(id string, state channels.SharedState) error {
@@ -143,5 +144,6 @@ func storeChannel(id string, state channels.SharedState) error {
 		return errors.New("channel does not exist")
 	}
 	c.State = *newState
+	globalState.Channels[id] = c
 	return nil
 }
