@@ -254,6 +254,7 @@ func send(args []string) error {
 		ID:        ch.RemoteID,
 		Amount:    amount,
 		SenderSig: sig,
+		Target:    target,
 	}
 	resp, err := c.Send(req)
 	output(req, resp, err)

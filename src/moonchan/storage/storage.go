@@ -13,11 +13,17 @@ type Record struct {
 	SharedState channels.SharedState
 }
 
+type Payment struct {
+	Target string
+	Amount int64
+}
+
 type Storage interface {
 	Get(id int) (*Record, error)
 	List() ([]Record, error)
 	Create(id int, s channels.SharedState) error
 	Update(id int, s channels.SharedState) error
-
+	Send(id int, s channels.SharedState, p Payment) error
 	ReserveKeyPath() (int, error)
+	ListPayments() ([]Payment, error)
 }

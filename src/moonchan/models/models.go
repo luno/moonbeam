@@ -31,6 +31,8 @@ type SendRequest struct {
 
 	Amount    int64
 	SenderSig []byte
+
+	Target string
 }
 
 type SendResponse struct {

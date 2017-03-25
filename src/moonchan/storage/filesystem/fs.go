@@ -2,62 +2,78 @@ package filesystem
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 
 	"moonchan/channels"
 	"moonchan/storage"
 )
 
-type metaInfo struct {
+type data struct {
 	KeyPathCounter int
+	Channels       map[int]channels.SimpleSharedState
+	Payments       []storage.Payment
+}
+
+func newData() *data {
+	return &data{
+		Channels: make(map[int]channels.SimpleSharedState),
+		Payments: []storage.Payment{},
+	}
 }
 
 type FilesystemStorage struct {
-	mu  sync.RWMutex
-	dir string
+	mu   sync.RWMutex
+	path string
 }
 
-func NewFilesystemStorage(dir string) *FilesystemStorage {
+func NewFilesystemStorage(path string) *FilesystemStorage {
 	return &FilesystemStorage{
-		dir: dir,
+		path: path,
 	}
 }
 
-func (fs *FilesystemStorage) getPath(id int) (string, error) {
-	s := strconv.Itoa(id)
-	return fs.dir + "/" + s + ".json", nil
-}
-
-func (fs *FilesystemStorage) getIdFromPath(path string) (int, error) {
-	path = strings.TrimPrefix(path, fs.dir+"/")
-	path = strings.TrimSuffix(path, ".json")
-	return strconv.Atoi(path)
-}
-
-func (fs *FilesystemStorage) Get(id int) (*storage.Record, error) {
-	fs.mu.RLock()
-	defer fs.mu.RUnlock()
-
-	path, err := fs.getPath(id)
-	if err != nil {
-		return nil, err
-	}
-
-	f, err := os.Open(path)
+func (fs *FilesystemStorage) load() (*data, error) {
+	f, err := os.Open(fs.path)
 	if os.IsNotExist(err) {
-		return nil, storage.ErrNotFound
+		return newData(), nil
 	} else if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	var sss channels.SimpleSharedState
-	if err := json.NewDecoder(f).Decode(&sss); err != nil {
+	var d data
+	if err := json.NewDecoder(f).Decode(&d); err != nil {
 		return nil, err
+	}
+	return &d, nil
+}
+
+func (fs *FilesystemStorage) save(d *data) error {
+	tmp := fs.path + ".tmp"
+
+	f, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if err := json.NewEncoder(f).Encode(d); err != nil {
+		return err
+	}
+
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tmp, fs.path)
+}
+
+func getChannel(d *data, id int) (*storage.Record, error) {
+	sss, ok := d.Channels[id]
+	if !ok {
+		return nil, storage.ErrNotFound
 	}
 
 	s, err := channels.FromSimple(sss)
@@ -71,23 +87,30 @@ func (fs *FilesystemStorage) Get(id int) (*storage.Record, error) {
 	}, nil
 }
 
+func (fs *FilesystemStorage) Get(id int) (*storage.Record, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
+	d, err := fs.load()
+	if err != nil {
+		return nil, err
+	}
+
+	return getChannel(d, id)
+}
+
 func (fs *FilesystemStorage) List() ([]storage.Record, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 
-	paths, err := filepath.Glob(fs.dir + "/*.json")
+	d, err := fs.load()
 	if err != nil {
 		return nil, err
 	}
 
 	var sl []storage.Record
-	for _, path := range paths {
-		id, err := fs.getIdFromPath(path)
-		if err != nil {
-			continue
-		}
-
-		r, err := fs.Get(id)
+	for id, _ := range d.Channels {
+		r, err := getChannel(d, id)
 		if err != nil {
 			return nil, err
 		}
@@ -95,14 +118,6 @@ func (fs *FilesystemStorage) List() ([]storage.Record, error) {
 	}
 
 	return sl, nil
-}
-
-func (fs *FilesystemStorage) count() (int64, error) {
-	paths, err := filepath.Glob(fs.dir + "/*.json")
-	if err != nil {
-		return 0, err
-	}
-	return int64(len(paths)), nil
 }
 
 func (fs *FilesystemStorage) Create(id int, s channels.SharedState) error {
@@ -114,22 +129,18 @@ func (fs *FilesystemStorage) Create(id int, s channels.SharedState) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	path, err := fs.getPath(id)
+	d, err := fs.load()
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
-	if err != nil {
-		return err
+	if _, ok := d.Channels[id]; ok {
+		return errors.New("record already exists")
 	}
 
-	if err := json.NewEncoder(f).Encode(sss); err != nil {
-		f.Close()
-		return err
-	}
+	d.Channels[id] = *sss
 
-	return f.Close()
+	return fs.save(d)
 }
 
 func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
@@ -138,7 +149,25 @@ func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
 		return err
 	}
 
-	path, err := fs.getPath(id)
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	d, err := fs.load()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := d.Channels[id]; !ok {
+		return storage.ErrNotFound
+	}
+
+	d.Channels[id] = *sss
+
+	return fs.save(d)
+}
+
+func (fs *FilesystemStorage) Send(id int, s channels.SharedState, p storage.Payment) error {
+	sss, err := s.ToSimple()
 	if err != nil {
 		return err
 	}
@@ -146,65 +175,45 @@ func (fs *FilesystemStorage) Update(id int, s channels.SharedState) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	f, err := os.OpenFile(path, os.O_WRONLY, 0666)
+	d, err := fs.load()
 	if err != nil {
 		return err
 	}
 
-	if err := json.NewEncoder(f).Encode(sss); err != nil {
-		f.Close()
-		return err
+	if _, ok := d.Channels[id]; !ok {
+		return storage.ErrNotFound
 	}
 
-	return f.Close()
-}
+	d.Channels[id] = *sss
+	d.Payments = append(d.Payments, p)
 
-func loadOrZero(path string) (*metaInfo, error) {
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return &metaInfo{}, nil
-	} else if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	var mi metaInfo
-	if err := json.NewDecoder(f).Decode(&mi); err != nil {
-		return nil, err
-	}
-
-	return &mi, nil
+	return fs.save(d)
 }
 
 func (fs *FilesystemStorage) ReserveKeyPath() (int, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	path := fs.dir + "/metainfo.json"
-
-	mi, err := loadOrZero(path)
+	d, err := fs.load()
 	if err != nil {
 		return 0, err
 	}
 
-	mi.KeyPathCounter++
+	d.KeyPathCounter++
 
-	tmp := path + ".tmp"
-	f, err := os.Create(tmp)
+	return d.KeyPathCounter, fs.save(d)
+}
+
+func (fs *FilesystemStorage) ListPayments() ([]storage.Payment, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	d, err := fs.load()
 	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-
-	if err := json.NewEncoder(f).Encode(mi); err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	if err := f.Close(); err != nil {
-		return 0, err
-	}
-
-	return mi.KeyPathCounter, os.Rename(tmp, path)
+	return d.Payments, nil
 }
 
 // Make sure FilesystemStorage implements Storage.

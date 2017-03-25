@@ -30,7 +30,7 @@ type Receiver struct {
 }
 
 func NewReceiver(net *chaincfg.Params, ek *hdkeychain.ExtendedKey, bc *btcrpcclient.Client, destination string) *Receiver {
-	ms := filesystem.NewFilesystemStorage("serverdata")
+	ms := filesystem.NewFilesystemStorage("server-state.json")
 
 	return &Receiver{
 		Net:            net,
@@ -59,6 +59,10 @@ func (r *Receiver) Get(id string) *channels.SharedState {
 
 func (r *Receiver) List() ([]storage.Record, error) {
 	return r.db.List()
+}
+
+func (r *Receiver) ListPayments() ([]storage.Payment, error) {
+	return r.db.ListPayments()
 }
 
 func (r *Receiver) getKey(n int) (*btcec.PrivateKey, error) {
@@ -235,8 +239,13 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		return nil, err
 	}
 
+	p := storage.Payment{
+		Target: req.Target,
+		Amount: req.Amount,
+	}
+
 	// FIXME: concurrent access
-	if err := r.db.Update(nid, c.State); err != nil {
+	if err := r.db.Send(nid, c.State, p); err != nil {
 		return nil, err
 	}
 

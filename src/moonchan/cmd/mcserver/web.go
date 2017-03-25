@@ -35,6 +35,35 @@ var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 
 <h1>Moonchan</h1>
 
+<ul>
+<li><a href="/channels">Channels</a></li>
+<li><a href="/payments">Payments</a></li>
+</ul>
+
+</div>
+</body>
+</html>`))
+
+func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	c := struct {
+	}{}
+	render(indexT, w, c)
+}
+
+var channelsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
+<html>
+<head>
+<title>Moonchan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<style>
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Moonchan</h1>
+
 <table class="table">
 <thead>
 <tr>
@@ -74,7 +103,7 @@ func (items chanItems) Swap(i, j int) {
 	items[i], items[j] = items[j], items[i]
 }
 
-func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+func channelsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 	recs, err := ss.Receiver.List()
 	if err != nil {
 		http.Error(w, "error", http.StatusInternalServerError)
@@ -86,7 +115,7 @@ func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 	c := struct {
 		ChanItems []storage.Record
 	}{recs}
-	render(indexT, w, c)
+	render(channelsT, w, c)
 }
 
 var detailsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
@@ -157,6 +186,54 @@ func closeHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(hex.EncodeToString(resp.CloseTx)))
+}
+
+var paymentsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
+<html>
+<head>
+<title>Moonchan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<style>
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Payments</h1>
+
+<table class="table">
+<thead>
+<tr>
+<th>Target</th>
+<th>Amount</th>
+</tr>
+</thead>
+<tbody>
+{{range .Payments}}
+<tr>
+<td>{{.Target}}</td>
+<td>{{.Amount}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+
+</div>
+</body>
+</html>`))
+
+func paymentsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	pl, err := ss.Receiver.ListPayments()
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+
+	c := struct {
+		Payments []storage.Payment
+	}{pl}
+	render(paymentsT, w, c)
 }
 
 func domainHandler(w http.ResponseWriter, r *http.Request) {
