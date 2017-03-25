@@ -19,6 +19,10 @@ var xprivkey = flag.String("privkey", "tprv8ZgxMBicQKsPe4s4h67jp6E3zhvfLRU6gnfrH
 var bitcoindHost = flag.String("bitcoind_host", "localhost:18332", "")
 var bitcoindUsername = flag.String("bitcoind_username", "username", "")
 var bitcoindPassword = flag.String("bitcoind_password", "password", "")
+var listenAddr = flag.String("listen", ":3211", "Address to listen on")
+var externalURL = flag.String("external_url", "https://example.com:3211", "External server URL")
+var tlsCert = flag.String("tls_cert", "tls/cert.pem", "TLS certificate")
+var tlsKey = flag.String("tls_key", "tls/key.pem", "TLS key")
 
 func getnet() *chaincfg.Params {
 	if *testnet {
@@ -96,10 +100,18 @@ func main() {
 	http.HandleFunc("/details", wrap(ss, detailsHandler))
 	http.HandleFunc("/close", wrap(ss, closeHandler))
 
+	if *externalURL != "" {
+		http.HandleFunc("/moonchan.json", domainHandler)
+	}
+
 	http.HandleFunc("/api/create", wrap(ss, rpcCreateHandler))
 	http.HandleFunc("/api/open", wrap(ss, rpcOpenHandler))
 	http.HandleFunc("/api/send", wrap(ss, rpcSendHandler))
 	http.HandleFunc("/api/close", wrap(ss, rpcCloseHandler))
 
-	log.Fatal(http.ListenAndServe(":3211", nil))
+	if *tlsCert == "" {
+		log.Fatal(http.ListenAndServe(*listenAddr, nil))
+	} else {
+		log.Fatal(http.ListenAndServeTLS(*listenAddr, *tlsCert, *tlsKey, nil))
+	}
 }

@@ -16,11 +16,14 @@ var debugRPC = flag.Bool("debug_rpc", true, "Debug RPC")
 
 type Client struct {
 	host string
-	c    http.Client
+	c    *http.Client
 }
 
-func NewClient(host string) *Client {
-	return &Client{host: host}
+func NewClient(c *http.Client, host string) *Client {
+	return &Client{
+		host: host,
+		c:    c,
+	}
 }
 
 func (c *Client) post(path string, req, resp interface{}) error {

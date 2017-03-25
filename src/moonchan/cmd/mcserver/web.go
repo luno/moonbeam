@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"moonchan/models"
+	"moonchan/resolver"
 	"moonchan/storage"
 )
 
@@ -156,4 +157,13 @@ func closeHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(hex.EncodeToString(resp.CloseTx)))
+}
+
+func domainHandler(w http.ResponseWriter, r *http.Request) {
+	d := resolver.Domain{
+		Receivers: []resolver.DomainReceiver{
+			{URL: *externalURL},
+		},
+	}
+	json.NewEncoder(w).Encode(d)
 }

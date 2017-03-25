@@ -1,11 +1,13 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -70,16 +72,42 @@ func loadkey(s *State, n int) (*btcec.PrivateKey, *btcutil.AddressPubKey, error)
 	return privKey, pubkey, nil
 }
 
+func getHttpClient() *http.Client {
+	if *testnet {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+		return &http.Client{Transport: tr}
+	} else {
+		return http.DefaultClient
+	}
+}
+
 func getClient(id string) *client.Client {
 	host := globalState.Channels[id].Host
-	return client.NewClient(host)
+	c := getHttpClient()
+	return client.NewClient(c, host)
+}
+
+func getResolver() *resolver.Resolver {
+	r := resolver.NewResolver()
+	r.Client = getHttpClient()
+
+	if *testnet {
+		r.DefaultPort = 3211
+	}
+
+	return r
 }
 
 func create(args []string) error {
 	domain := args[0]
 	outputAddr := args[1]
 
-	hostURL, err := resolver.Resolve(domain)
+	r := getResolver()
+	hostURL, err := r.Resolve(domain)
 	if err != nil {
 		return err
 	}
@@ -97,7 +125,8 @@ func create(args []string) error {
 		return err
 	}
 
-	c := client.NewClient(host)
+	httpClient := getHttpClient()
+	c := client.NewClient(httpClient, host)
 	var req models.CreateRequest
 	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
 	req.SenderOutput = s.State.SenderOutput

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -16,7 +17,19 @@ type Domain struct {
 	Receivers []DomainReceiver `json:"receivers"`
 }
 
-func Resolve(domain string) (*url.URL, error) {
+type Resolver struct {
+	Client      *http.Client
+	DefaultPort int
+}
+
+func NewResolver() *Resolver {
+	var c http.Client
+	return &Resolver{
+		Client: &c,
+	}
+}
+
+func (r *Resolver) Resolve(domain string) (*url.URL, error) {
 	if u, err := url.Parse(domain); err == nil {
 		if u.Scheme != "" {
 			return u, nil
@@ -28,7 +41,11 @@ func Resolve(domain string) (*url.URL, error) {
 	rurl.Host = domain
 	rurl.Path = "/moonchan.json"
 
-	resp, err := http.Get(rurl.String())
+	if r.DefaultPort != 0 {
+		rurl.Host += ":" + strconv.Itoa(r.DefaultPort)
+	}
+
+	resp, err := r.Client.Get(rurl.String())
 	if err != nil {
 		return nil, err
 	}
