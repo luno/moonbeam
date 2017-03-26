@@ -15,7 +15,7 @@ import (
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
 var destination = flag.String("destination", "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5", "Destination address")
-var xprivkey = flag.String("privkey", "tprv8ZgxMBicQKsPe4s4h67jp6E3zhvfLRU6gnfrHRiwdfL3dR6AWJCw8sCiiGDVM4Nvw3muHfsdfbWVZwDi5TdiwiHrfYDXxGrfRFoYtdF2vnb", "Key chain extended private key")
+var xprivkey = flag.String("xprivkey", "tprv8ZgxMBicQKsPe4s4h67jp6E3zhvfLRU6gnfrHRiwdfL3dR6AWJCw8sCiiGDVM4Nvw3muHfsdfbWVZwDi5TdiwiHrfYDXxGrfRFoYtdF2vnb", "Key chain extended private key")
 var bitcoindHost = flag.String("bitcoind_host", "localhost:18332", "")
 var bitcoindUsername = flag.String("bitcoind_username", "username", "")
 var bitcoindPassword = flag.String("bitcoind_password", "password", "")

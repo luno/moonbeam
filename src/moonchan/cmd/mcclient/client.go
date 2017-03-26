@@ -22,17 +22,6 @@ import (
 	"moonchan/resolver"
 )
 
-func output(req interface{}, resp interface{}, err error) error {
-	if err != nil {
-		buf, _ := json.MarshalIndent(req, "", "    ")
-		fmt.Printf("%s\n", string(buf))
-	} else {
-		buf, _ := json.MarshalIndent(resp, "", "    ")
-		fmt.Printf("%s\n", string(buf))
-	}
-	return err
-}
-
 var testnet = flag.Bool("testnet", true, "Use testnet")
 
 func getNet() *chaincfg.Params {
@@ -131,7 +120,6 @@ func create(args []string) error {
 	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
 	req.SenderOutput = s.State.SenderOutput
 	resp, err := c.Create(req)
-	output(req, resp, err)
 	if err != nil {
 		return err
 	}
@@ -155,9 +143,10 @@ func create(args []string) error {
 		return errors.New("state discrepancy")
 	}
 
-	if _, ok := globalState.Channels[resp.ID]; ok {
+	if hasRemoteID(domain, resp.ID) {
 		return errors.New("reused channel id")
 	}
+
 	ss, err := s.State.ToSimple()
 	if err != nil {
 		return err
@@ -207,9 +196,7 @@ func fund(args []string) error {
 		Vout:      uint32(vout),
 		SenderSig: sig,
 	}
-	resp, err := c.Open(req)
-	output(req, resp, err)
-	if err != nil {
+	if _, err := c.Open(req); err != nil {
 		return err
 	}
 
@@ -256,9 +243,7 @@ func send(args []string) error {
 		SenderSig: sig,
 		Target:    target,
 	}
-	resp, err := c.Send(req)
-	output(req, resp, err)
-	if err != nil {
+	if _, err := c.Send(req); err != nil {
 		return err
 	}
 
@@ -282,7 +267,6 @@ func closeAction(args []string) error {
 		ID: ch.RemoteID,
 	}
 	resp, err := c.Close(req)
-	output(req, resp, err)
 	if err != nil {
 		return err
 	}
