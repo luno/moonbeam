@@ -347,21 +347,61 @@ func show(args []string) error {
 	return nil
 }
 
+func help(args []string) error {
+	fmt.Printf("Available commands:\n")
+	for action, _ := range commands {
+		h := helps[action]
+		fmt.Printf("%10s %s\n", action, h)
+	}
+	return nil
+}
+
 func outputError(err string) {
 	fmt.Printf("%v\n", err)
 	os.Exit(1)
+}
+
+var commands = map[string]func(args []string) error{
+	"create": create,
+	"fund":   fund,
+	"send":   send,
+	"close":  closeAction,
+	"refund": refund,
+	"list":   list,
+	"show":   show,
+}
+
+var helps = map[string]string{
+	"create": "Create a channel to a remote server",
+	"fund":   "Open a created channel after funding transaction is confirmed",
+	"send":   "Send a payment",
+	"close":  "Close a channel",
+	"refund": "Show the refund transaction for a channel",
+	"list":   "List channels",
+	"show":   "Show info about a channel",
+	"help":   "Show help",
 }
 
 func main() {
 	flag.Parse()
 
 	args := flag.Args()
+
+	action := ""
 	if len(args) == 0 {
-		outputError("missing command")
+		action = "help"
+	} else {
+		action = args[0]
+		args = args[1:]
+	}
+
+	commands["help"] = help
+
+	f, ok := commands[action]
+	if !ok {
+		outputError("unknown command")
 		return
 	}
-	action := args[0]
-	args = args[1:]
 
 	net := getNet()
 
@@ -371,23 +411,7 @@ func main() {
 	}
 	globalState = s
 
-	err = errors.New("unknown command")
-	switch action {
-	case "create":
-		err = create(args)
-	case "fund":
-		err = fund(args)
-	case "send":
-		err = send(args)
-	case "close":
-		err = closeAction(args)
-	case "refund":
-		err = refund(args)
-	case "list":
-		err = list(args)
-	case "show":
-		err = show(args)
-	}
+	err = f(args)
 	if err == nil {
 		err = save(net, globalState)
 	}
