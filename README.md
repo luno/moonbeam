@@ -4,7 +4,8 @@ Moonbeam
 Installation
 ------------
 
-```git clone git@bitbucket.org:bitx/moonchan.git
+```
+git clone git@bitbucket.org:bitx/moonchan.git
 cd moonchan
 source ./vars.sh
 go get github.com/btcsuite/btcutil
@@ -26,7 +27,8 @@ should be kept safe and be backed-up.
 First we need to initiate a channel opening to a remote server. In this case,
 https://bitcoinmoonbeam.org:
 
-```./bin/mcclient create bitcoinmoonbeam.org <refundaddr>
+```
+./bin/mcclient create bitcoinmoonbeam.org <refundaddr>
 ```
 
 `refundaddr` is your own wallet address where the balance of coins will be
@@ -36,7 +38,8 @@ The funding address and channel ID are printed if successful.
 
 To see the channel info, you can run:
 
-```./bin/mcclient list -a
+```
+./bin/mcclient list -a
 ```
 
 To see the channel info on the server, visit
@@ -51,24 +54,28 @@ any wallet.
 You must wait for the transaction to confirm before proceeding.
 Once the transaction has confirmed run:
 
-```./bin/mcclient fund <id> <txid> <vout> <amount_in_satoshi>
+```
+./bin/mcclient fund <id> <txid> <vout> <amount_in_satoshi>
 ```
 
 If successful, the channel is now open. To see your open channels, run:
 
-```./bin/mcclient list
+```
+./bin/mcclient list
 ```
 
 To get more info about this particular channel, run:
 
-```./bin/mcclient show <id>
+```
+./bin/mcclient show <id>
 ```
 
 ### Send payments
 
 Now that the channel is open, you can send payments:
 
-```./bin/mcclient send test@bitcoinmoonbeam.org 1000
+```
+./bin/mcclient send test@bitcoinmoonbeam.org 1000
 ```
 
 This will send 1000 satoshi to test@bitcoinmoonbeam.org.
@@ -80,7 +87,8 @@ https://bitcoinmoonbeam.org/payments
 
 Once you're done, you can close the channel:
 
-```./bin/mcclient close <id>
+```
+./bin/mcclient close <id>
 ```
 
 This will print the closure transaction. The server should submit it to the
