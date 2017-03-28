@@ -111,6 +111,8 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 
 	resp := models.CreateResponse{
 		ID:             strconv.Itoa(n),
+		Timeout:        c.State.Timeout,
+		Fee:            c.State.Fee,
 		ReceiverPubKey: receiverPubKey,
 		ReceiverOutput: ss.ReceiverOutput,
 		FundingAddress: addr,

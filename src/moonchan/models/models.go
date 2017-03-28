@@ -8,6 +8,9 @@ type CreateRequest struct {
 type CreateResponse struct {
 	ID string
 
+	Timeout int64
+	Fee     int64
+
 	ReceiverPubKey []byte
 	ReceiverOutput string
 

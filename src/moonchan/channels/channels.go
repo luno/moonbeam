@@ -148,11 +148,33 @@ func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey, outputAddr str
 	return &c, nil
 }
 
-func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey, receiverOutput string) error {
+const (
+	minTimeout = 100
+	maxTimeout = 200
+	minFee     = 10000
+	maxFee     = 100000
+)
+
+func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey, receiverOutput string, timeout, fee int64) error {
 	if err := checkSupportedAddress(s.State.Net, receiverOutput); err != nil {
 		return err
 	}
 
+	if timeout < minTimeout {
+		return errors.New("timeout is too small")
+	}
+	if timeout > maxTimeout {
+		return errors.New("timeout is too large")
+	}
+	if fee < minFee {
+		return errors.New("fee is too small")
+	}
+	if fee > maxFee {
+		return errors.New("fee is too large")
+	}
+
+	s.State.Timeout = timeout
+	s.State.Fee = fee
 	s.State.ReceiverPubKey = pubKey
 	s.State.ReceiverOutput = receiverOutput
 

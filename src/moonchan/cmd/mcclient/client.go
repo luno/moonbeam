@@ -129,7 +129,10 @@ func create(args []string) error {
 		return err
 	}
 
-	s.ReceivedPubKey(receiverPubKey, resp.ReceiverOutput)
+	err = s.ReceivedPubKey(receiverPubKey, resp.ReceiverOutput, resp.Timeout, resp.Fee)
+	if err != nil {
+		return err
+	}
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {

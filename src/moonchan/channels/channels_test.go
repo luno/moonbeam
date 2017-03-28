@@ -43,7 +43,10 @@ func TestImmediateClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -98,7 +101,10 @@ func TestRefund(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -143,7 +149,10 @@ func TestSend(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, addr, err := s.State.GetFundingScript()
 	if err != nil {
@@ -222,7 +231,10 @@ func TestInvalidSendSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, _, err := s.State.GetFundingScript(); err != nil {
 		t.Fatal(err)
@@ -272,7 +284,10 @@ func TestSendDust(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, _, err := s.State.GetFundingScript(); err != nil {
 		t.Fatal(err)
@@ -318,7 +333,10 @@ func TestCapacityTooLow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.ReceivedPubKey(r.State.ReceiverPubKey, addr2)
+	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, _, err := s.State.GetFundingScript(); err != nil {
 		t.Fatal(err)
