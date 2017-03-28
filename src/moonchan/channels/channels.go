@@ -76,6 +76,10 @@ func (ss *SharedState) validateAmount(amount int64) (int64, error) {
 
 	newBalance := ss.Balance + amount
 
+	if newBalance < dustThreshold {
+		return ss.Balance, errors.New("amount is too small")
+	}
+
 	if newBalance+ss.Fee > ss.FundingAmount {
 		return ss.Balance, errors.New("insufficient channel capacity")
 	}

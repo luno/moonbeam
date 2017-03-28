@@ -310,6 +310,11 @@ func TestSendDust(t *testing.T) {
 	const amount = 100
 
 	sig, err = s.PrepareSend(amount)
+	if err == nil {
+		t.Errorf("Expected error due to amount too small")
+	}
+
+	sig, err = s.signBalance(amount)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -91,14 +91,12 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	receiveAmount := balance
 	senderAmount := s.FundingAmount - balance - s.Fee
 
-	// TODO: handle dust output case
-
 	tx, err := s.spendFundingTx()
 	if err != nil {
 		return nil, err
 	}
 
-	if receiveAmount > 0 {
+	if receiveAmount >= dustThreshold {
 		txout, err := sendToAddress(s.Net, receiveAmount, s.ReceiverOutput)
 		if err != nil {
 			return nil, err
@@ -106,7 +104,7 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 		tx.AddTxOut(txout)
 	}
 
-	if senderAmount > 0 {
+	if senderAmount >= dustThreshold {
 		txout, err := sendToAddress(s.Net, senderAmount, s.SenderOutput)
 		if err != nil {
 			return nil, err
