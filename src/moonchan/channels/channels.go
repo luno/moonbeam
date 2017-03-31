@@ -12,19 +12,16 @@ import (
 type Status int
 
 const (
-	StatusNotStarted      = 1
-	StatusPreInfoGathered = 2
-	StatusOpen            = 3
-	StatusClosing         = 4
-	StatusClosed          = 5
+	StatusCreated = 1
+	StatusOpen    = 2
+	StatusClosing = 3
+	StatusClosed  = 4
 )
 
 func (s Status) String() string {
 	switch s {
-	case StatusNotStarted:
-		return "NOT_STARTED"
-	case StatusPreInfoGathered:
-		return "PRE_INFO_GATHERED"
+	case StatusCreated:
+		return "CREATED"
 	case StatusOpen:
 		return "OPEN"
 	case StatusClosing:
@@ -59,10 +56,10 @@ type SharedState struct {
 	SenderOutput   string
 	ReceiverOutput string
 
-	FundingTxID   string
-	FundingVout   uint32
-	FundingAmount int64
-	BlockHeight   int
+	FundingTxID string
+	FundingVout uint32
+	Capacity    int64
+	BlockHeight int
 
 	Balance   int64
 	Count     int
@@ -80,7 +77,7 @@ func (ss *SharedState) validateAmount(amount int64) (int64, error) {
 		return ss.Balance, errors.New("amount is too small")
 	}
 
-	if newBalance+ss.Fee > ss.FundingAmount {
+	if newBalance+ss.Fee > ss.Capacity {
 		return ss.Balance, errors.New("insufficient channel capacity")
 	}
 
@@ -93,7 +90,7 @@ func DefaultState(net *chaincfg.Params) SharedState {
 		Net:     net,
 		Timeout: DefaultTimeout,
 		Fee:     75000,
-		Status:  StatusNotStarted,
+		Status:  StatusCreated,
 	}
 }
 
@@ -205,7 +202,7 @@ func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, err
 	}
 
 	state.ReceiverPubKey = pubKey
-	state.Status = StatusPreInfoGathered
+	state.Status = StatusCreated
 
 	c := Receiver{
 		State:   state,
@@ -218,7 +215,7 @@ func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, err
 func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height int) ([]byte, error) {
 	s.State.FundingTxID = txid
 	s.State.FundingVout = vout
-	s.State.FundingAmount = amount
+	s.State.Capacity = amount
 	s.State.BlockHeight = height
 	s.State.Status = StatusOpen
 
@@ -234,7 +231,7 @@ func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, send
 
 	r.State.FundingTxID = txid
 	r.State.FundingVout = vout
-	r.State.FundingAmount = amount
+	r.State.Capacity = amount
 	r.State.BlockHeight = height
 
 	if err := r.validateSenderSig(0, senderSig); err != nil {

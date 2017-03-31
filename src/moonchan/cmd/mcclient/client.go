@@ -331,7 +331,7 @@ func list(args []string) error {
 		if c.State.Status != channels.StatusOpen && !all {
 			continue
 		}
-		total := float64(c.State.FundingAmount) / 1e8
+		total := float64(c.State.Capacity) / 1e8
 		balance := float64(c.State.Balance) / 1e8
 		fmt.Printf("%s\t%s\t%s\t%.8f\t%.8f\n",
 			id, c.Domain, c.State.Status, total, balance)

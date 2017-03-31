@@ -89,7 +89,7 @@ func sendToAddress(net *chaincfg.Params, amount int64, addr string) (*wire.TxOut
 
 func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	receiveAmount := balance
-	senderAmount := s.FundingAmount - balance - s.Fee
+	senderAmount := s.Capacity - balance - s.Fee
 
 	tx, err := s.spendFundingTx()
 	if err != nil {
@@ -159,7 +159,7 @@ func (s *SharedState) GetRefundTxSigned(privKey *btcec.PrivateKey) ([]byte, erro
 		return nil, err
 	}
 
-	amount := s.FundingAmount - s.Fee
+	amount := s.Capacity - s.Fee
 	txout, err := sendToAddress(s.Net, amount, s.SenderOutput)
 	if err != nil {
 		return nil, err

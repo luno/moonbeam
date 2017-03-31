@@ -21,10 +21,10 @@ type SimpleSharedState struct {
 	SenderOutput   string
 	ReceiverOutput string
 
-	FundingTxID   string
-	FundingVout   uint32
-	FundingAmount int64
-	BlockHeight   int
+	FundingTxID string
+	FundingVout uint32
+	Capacity    int64
+	BlockHeight int
 
 	Balance   int64
 	Count     int
@@ -58,7 +58,7 @@ func (ss *SharedState) ToSimple() (*SimpleSharedState, error) {
 		ReceiverPubKey: ss.ReceiverPubKey.PubKey().SerializeCompressed(),
 		FundingTxID:    ss.FundingTxID,
 		FundingVout:    ss.FundingVout,
-		FundingAmount:  ss.FundingAmount,
+		Capacity:       ss.Capacity,
 		BlockHeight:    ss.BlockHeight,
 		Balance:        ss.Balance,
 		Count:          ss.Count,
@@ -97,7 +97,7 @@ func FromSimple(s SimpleSharedState) (*SharedState, error) {
 		ReceiverPubKey: receiverPubKey,
 		FundingTxID:    s.FundingTxID,
 		FundingVout:    s.FundingVout,
-		FundingAmount:  s.FundingAmount,
+		Capacity:       s.Capacity,
 		BlockHeight:    s.BlockHeight,
 		Balance:        s.Balance,
 		Count:          s.Count,

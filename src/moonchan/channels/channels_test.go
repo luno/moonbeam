@@ -361,7 +361,7 @@ func TestCapacityTooLow(t *testing.T) {
 	if err := r.Open(txid, vout, fundAmount, height, sig); err == nil {
 		t.Errorf("Expected error due to capacity too low")
 	}
-	if r.State.Status != StatusPreInfoGathered {
+	if r.State.Status != StatusCreated {
 		t.Errorf("Wrong status: %s", r.State.Status)
 	}
 }
