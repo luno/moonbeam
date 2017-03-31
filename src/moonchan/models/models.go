@@ -1,50 +1,50 @@
 package models
 
 type CreateRequest struct {
-	SenderPubKey []byte
-	SenderOutput string
+	SenderPubKey []byte `json:"senderPubKey"`
+	SenderOutput string `json:"senderOutput"`
 }
 
 type CreateResponse struct {
-	ID string
+	ID string `json:"id"`
 
-	Timeout int64
-	Fee     int64
+	Timeout int64 `json:"timeout"`
+	Fee     int64 `json:"fee"`
 
-	ReceiverPubKey []byte
-	ReceiverOutput string
+	ReceiverPubKey []byte `json:"receiverPubKey"`
+	ReceiverOutput string `json:"receiverOutput"`
 
-	FundingAddress string
+	FundingAddress string `json:"fundingAddress"`
 }
 
 type OpenRequest struct {
-	ID string
+	ID string `json:"id"`
 
-	TxID string
-	Vout uint32
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 
-	SenderSig []byte
+	SenderSig []byte `json:"senderSig"`
 }
 
 type OpenResponse struct {
 }
 
 type SendRequest struct {
-	ID string
+	ID string `json:"id"`
 
-	Amount    int64
-	SenderSig []byte
+	Amount    int64  `json:"amount"`
+	SenderSig []byte `json:"senderSig"`
 
-	Target string
+	Target string `json:"target"`
 }
 
 type SendResponse struct {
 }
 
 type CloseRequest struct {
-	ID string
+	ID string `json:"id"`
 }
 
 type CloseResponse struct {
-	CloseTx []byte
+	CloseTx []byte `json:"closeTx"`
 }
