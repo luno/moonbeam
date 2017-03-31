@@ -2,7 +2,6 @@ package receiver
 
 import (
 	"log"
-	"strconv"
 	"time"
 
 	"moonchan/channels"
@@ -24,7 +23,7 @@ func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {
 
 	log.Printf("Closing channel %s due to nearing timeout", rec.ID)
 
-	req := models.CloseRequest{ID: strconv.Itoa(rec.ID)}
+	req := models.CloseRequest{ID: rec.ID}
 	_, err := r.Close(req)
 	return err
 }

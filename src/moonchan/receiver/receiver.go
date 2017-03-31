@@ -2,10 +2,11 @@ package receiver
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"log"
-	"strconv"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -42,19 +43,20 @@ func NewReceiver(net *chaincfg.Params, ek *hdkeychain.ExtendedKey, bc *btcrpccli
 }
 
 func (r *Receiver) Get(id string) *channels.SharedState {
-	nid, err := strconv.Atoi(id)
+	rec, err := r.db.Get(id)
 	if err != nil {
+		return nil
+	}
+	if rec == nil {
 		return nil
 	}
 
-	s, err := r.db.Get(nid)
+	ss, err := channels.FromSimple(rec.SharedState)
 	if err != nil {
+		// FIXME: report error
 		return nil
 	}
-	if s == nil {
-		return nil
-	}
-	return &s.SharedState
+	return ss
 }
 
 func (r *Receiver) List() ([]storage.Record, error) {
@@ -71,6 +73,15 @@ func (r *Receiver) getKey(n int) (*btcec.PrivateKey, error) {
 		return nil, err
 	}
 	return ek.ECPrivKey()
+}
+
+func genChannelID() (string, error) {
+	buf := make([]byte, 32)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, error) {
@@ -98,11 +109,25 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	if err := r.db.Create(n, c.State); err != nil {
+	id, err := genChannelID()
+	if err != nil {
 		return nil, err
 	}
 
-	receiverPubKey := c.State.ReceiverPubKey.PubKey().SerializeCompressed()
+	sss, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
+
+	rec := storage.Record{
+		ID:          id,
+		KeyPath:     n,
+		SharedState: *sss,
+	}
+
+	if err := r.db.Create(rec); err != nil {
+		return nil, err
+	}
 
 	_, addr, err := c.State.GetFundingScript()
 	if err != nil {
@@ -110,11 +135,11 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 	}
 
 	resp := models.CreateResponse{
-		ID:             strconv.Itoa(n),
+		ID:             rec.ID,
 		Timeout:        c.State.Timeout,
 		Fee:            c.State.Fee,
-		ReceiverPubKey: receiverPubKey,
-		ReceiverOutput: ss.ReceiverOutput,
+		ReceiverPubKey: sss.ReceiverPubKey,
+		ReceiverOutput: sss.ReceiverOutput,
 		FundingAddress: addr,
 	}
 	return &resp, nil
@@ -165,36 +190,39 @@ func getHeight(bc *btcrpcclient.Client, blockhash string) (int64, error) {
 	return int64(header.Height), nil
 }
 
-func (r *Receiver) get(id string) (int, *channels.Receiver, error) {
-	nid, err := strconv.Atoi(id)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	rec, err := r.db.Get(nid)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	privKey, err := r.getKey(nid)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	c, err := channels.NewReceiver(rec.SharedState, privKey)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	return nid, c, nil
-}
-
-func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
-	nid, c, err := r.get(req.ID)
+func (r *Receiver) get(id string) (*channels.Receiver, error) {
+	rec, err := r.db.Get(id)
 	if err != nil {
 		return nil, err
 	}
-	prev := c.State
+
+	privKey, err := r.getKey(rec.KeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	ss, err := channels.FromSimple(rec.SharedState)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := channels.NewReceiver(*ss, privKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
+func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
+	c, err := r.get(req.ID)
+	if err != nil {
+		return nil, err
+	}
+	prev, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
 
 	_, addr, err := c.State.GetFundingScript()
 	if err != nil {
@@ -224,7 +252,12 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	if err := r.db.Update(nid, prev, c.State); err != nil {
+	newState, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.db.Update(req.ID, *prev, *newState); err != nil {
 		return nil, err
 	}
 
@@ -232,11 +265,14 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 }
 
 func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
-	nid, c, err := r.get(req.ID)
+	c, err := r.get(req.ID)
 	if err != nil {
 		return nil, err
 	}
-	prev := c.State
+	prev, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := c.Send(req.Amount, req.SenderSig); err != nil {
 		return nil, err
@@ -247,7 +283,12 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		Amount: req.Amount,
 	}
 
-	if err := r.db.Send(nid, prev, c.State, p); err != nil {
+	newState, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.db.Send(req.ID, *prev, *newState, p); err != nil {
 		return nil, err
 	}
 
@@ -255,11 +296,14 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 }
 
 func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error) {
-	nid, c, err := r.get(req.ID)
+	c, err := r.get(req.ID)
 	if err != nil {
 		return nil, err
 	}
-	prev := c.State
+	prev, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
 
 	rawTx, err := c.Close()
 	if err != nil {
@@ -268,7 +312,12 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	log.Printf("closeTx: %s", hex.EncodeToString(rawTx))
 
-	if err := r.db.Update(nid, prev, c.State); err != nil {
+	newState, err := c.State.ToSimple()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.db.Update(req.ID, *prev, *newState); err != nil {
 		return nil, err
 	}
 

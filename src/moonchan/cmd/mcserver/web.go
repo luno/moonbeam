@@ -81,7 +81,7 @@ var channelsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 <tr>
 <td><a href="/details?id={{.ID}}">{{.ID}}</a></td>
 <td>{{.SharedState.Status}}</td>
-<td>{{.SharedState.FundingAmount}}</td>
+<td>{{.SharedState.Capacity}}</td>
 <td>{{.SharedState.Balance}}</td>
 <td>{{.SharedState.Count}}</td>
 </tr>

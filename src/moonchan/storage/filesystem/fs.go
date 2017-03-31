@@ -12,13 +12,13 @@ import (
 
 type data struct {
 	KeyPathCounter int
-	Channels       map[int]channels.SimpleSharedState
+	Channels       map[string]storage.Record
 	Payments       []storage.Payment
 }
 
 func newData() *data {
 	return &data{
-		Channels: make(map[int]channels.SimpleSharedState),
+		Channels: make(map[string]storage.Record),
 		Payments: []storage.Payment{},
 	}
 }
@@ -70,24 +70,15 @@ func (fs *FilesystemStorage) save(d *data) error {
 	return os.Rename(tmp, fs.path)
 }
 
-func getChannel(d *data, id int) (*storage.Record, error) {
-	sss, ok := d.Channels[id]
+func getChannel(d *data, id string) (*storage.Record, error) {
+	r, ok := d.Channels[id]
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
-
-	s, err := channels.FromSimple(sss)
-	if err != nil {
-		return nil, err
-	}
-
-	return &storage.Record{
-		ID:          id,
-		SharedState: *s,
-	}, nil
+	return &r, nil
 }
 
-func (fs *FilesystemStorage) Get(id int) (*storage.Record, error) {
+func (fs *FilesystemStorage) Get(id string) (*storage.Record, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 
@@ -120,10 +111,9 @@ func (fs *FilesystemStorage) List() ([]storage.Record, error) {
 	return sl, nil
 }
 
-func (fs *FilesystemStorage) Create(id int, s channels.SharedState) error {
-	sss, err := s.ToSimple()
-	if err != nil {
-		return err
+func (fs *FilesystemStorage) Create(rec storage.Record) error {
+	if rec.ID == "" {
+		return errors.New("invalid id")
 	}
 
 	fs.mu.Lock()
@@ -134,26 +124,21 @@ func (fs *FilesystemStorage) Create(id int, s channels.SharedState) error {
 		return err
 	}
 
-	if _, ok := d.Channels[id]; ok {
+	if _, ok := d.Channels[rec.ID]; ok {
 		return errors.New("record already exists")
 	}
 
-	d.Channels[id] = *sss
+	d.Channels[rec.ID] = rec
 
 	return fs.save(d)
 }
 
-func checkSame(d *data, id int, prev channels.SharedState) bool {
-	s := d.Channels[id]
+func checkSame(d *data, id string, prev channels.SimpleSharedState) bool {
+	s := d.Channels[id].SharedState
 	return s.Status == prev.Status && s.Count == prev.Count
 }
 
-func (fs *FilesystemStorage) Update(id int, prev, new channels.SharedState) error {
-	sss, err := new.ToSimple()
-	if err != nil {
-		return err
-	}
-
+func (fs *FilesystemStorage) Update(id string, prev, new channels.SimpleSharedState) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
@@ -170,17 +155,14 @@ func (fs *FilesystemStorage) Update(id int, prev, new channels.SharedState) erro
 		return storage.ErrConcurrentUpdate
 	}
 
-	d.Channels[id] = *sss
+	rec := d.Channels[id]
+	rec.SharedState = new
+	d.Channels[id] = rec
 
 	return fs.save(d)
 }
 
-func (fs *FilesystemStorage) Send(id int, prev, new channels.SharedState, p storage.Payment) error {
-	sss, err := new.ToSimple()
-	if err != nil {
-		return err
-	}
-
+func (fs *FilesystemStorage) Send(id string, prev, new channels.SimpleSharedState, p storage.Payment) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
@@ -197,7 +179,9 @@ func (fs *FilesystemStorage) Send(id int, prev, new channels.SharedState, p stor
 		return storage.ErrConcurrentUpdate
 	}
 
-	d.Channels[id] = *sss
+	rec := d.Channels[id]
+	rec.SharedState = new
+	d.Channels[id] = rec
 	d.Payments = append(d.Payments, p)
 
 	return fs.save(d)

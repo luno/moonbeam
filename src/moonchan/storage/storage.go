@@ -10,8 +10,9 @@ var ErrNotFound = errors.New("record not found")
 var ErrConcurrentUpdate = errors.New("concurrent update")
 
 type Record struct {
-	ID          int
-	SharedState channels.SharedState
+	ID          string
+	KeyPath     int
+	SharedState channels.SimpleSharedState
 }
 
 type Payment struct {
@@ -20,11 +21,11 @@ type Payment struct {
 }
 
 type Storage interface {
-	Get(id int) (*Record, error)
+	Get(id string) (*Record, error)
 	List() ([]Record, error)
-	Create(id int, s channels.SharedState) error
-	Update(id int, prev, new channels.SharedState) error
-	Send(id int, prev, new channels.SharedState, p Payment) error
+	Create(rec Record) error
+	Update(id string, prev, new channels.SimpleSharedState) error
+	Send(id string, prev, new channels.SimpleSharedState, p Payment) error
 	ReserveKeyPath() (int, error)
 	ListPayments() ([]Payment, error)
 }
