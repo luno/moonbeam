@@ -82,8 +82,12 @@ func TestImmediateClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.CloseMined()
-	r.CloseMined()
+	if err := s.CloseMined(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.CloseMined(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRefund(t *testing.T) {
@@ -212,8 +216,12 @@ func TestSend(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.CloseMined()
-	r.CloseMined()
+	if err := s.CloseMined(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.CloseMined(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestInvalidSendSig(t *testing.T) {

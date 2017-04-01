@@ -100,14 +100,16 @@ func DefaultState(net *chaincfg.Params) SharedState {
 	}
 }
 
+var ErrInvalidAddress = errors.New("invalid address")
+
 func checkSupportedAddress(net *chaincfg.Params, addr string) error {
 	a, err := btcutil.DecodeAddress(addr, net)
 	if err != nil {
-		return err
+		return ErrInvalidAddress
 	}
 
 	if !a.IsForNet(net) {
-		return errors.New("wrong net")
+		return ErrInvalidAddress
 	}
 
 	if _, ok := a.(*btcutil.AddressPubKeyHash); ok {
@@ -117,7 +119,7 @@ func checkSupportedAddress(net *chaincfg.Params, addr string) error {
 		return nil
 	}
 
-	return errors.New("unsupported output type")
+	return ErrInvalidAddress
 }
 
 type Sender struct {
@@ -218,7 +220,16 @@ func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, err
 	return &c, nil
 }
 
+var ErrNotStatusCreated = errors.New("channel is not in state created")
+var ErrNotStatusOpen = errors.New("channel is not in state open")
+var ErrNotStatusClosing = errors.New("channel is not in state closing")
+
+// The caller must check that the (txid, vout) output is unspent and confirmed.
 func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height int) ([]byte, error) {
+	if s.State.Status != StatusCreated {
+		return nil, ErrNotStatusCreated
+	}
+
 	s.State.FundingTxID = txid
 	s.State.FundingVout = vout
 	s.State.Capacity = amount
@@ -229,6 +240,9 @@ func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height i
 }
 
 func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, senderSig []byte) error {
+	if r.State.Status != StatusCreated {
+		return ErrNotStatusCreated
+	}
 
 	minCapacity := r.State.Fee + dustThreshold
 	if amount < minCapacity {
@@ -266,6 +280,10 @@ func (s *Sender) signBalance(balance int64) ([]byte, error) {
 }
 
 func (s *Sender) PrepareSend(amount int64) ([]byte, error) {
+	if s.State.Status != StatusOpen {
+		return nil, ErrNotStatusOpen
+	}
+
 	newBalance, err := s.State.validateAmount(amount)
 	if err != nil {
 		return nil, err
@@ -289,7 +307,7 @@ func (r *Receiver) validateSenderSig(balance int64, senderSig []byte) error {
 
 func (r *Receiver) Send(amount int64, senderSig []byte) error {
 	if r.State.Status != StatusOpen {
-		return errors.New("channel not open")
+		return ErrNotStatusOpen
 	}
 
 	newBalance, err := r.State.validateAmount(amount)
@@ -301,18 +319,18 @@ func (r *Receiver) Send(amount int64, senderSig []byte) error {
 		return err
 	}
 
-	// all good, update the state
-	// lock
-	// if not open, error
 	r.State.Count++
 	r.State.Balance = newBalance
 	r.State.SenderSig = senderSig
-	// unlock
 
 	return nil
 }
 
 func (s *Sender) SendAccepted(amount int64) error {
+	if s.State.Status != StatusOpen {
+		return ErrNotStatusOpen
+	}
+
 	s.State.Count++
 	s.State.Balance += amount
 	return nil
@@ -320,7 +338,7 @@ func (s *Sender) SendAccepted(amount int64) error {
 
 func (r *Receiver) Close() ([]byte, error) {
 	if r.State.Status != StatusOpen && r.State.Status != StatusClosing {
-		return nil, errors.New("cannot close channel that isn't open")
+		return nil, ErrNotStatusOpen
 	}
 
 	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.State.SenderSig, r.PrivKey)
@@ -335,7 +353,7 @@ func (r *Receiver) Close() ([]byte, error) {
 
 func (s *Sender) CloseReceived(rawTx []byte) error {
 	if s.State.Status != StatusOpen && s.State.Status != StatusClosing {
-		return errors.New("cannot close channel that isn't open")
+		return ErrNotStatusOpen
 	}
 
 	if err := s.State.validateTx(rawTx); err != nil {
@@ -346,12 +364,20 @@ func (s *Sender) CloseReceived(rawTx []byte) error {
 	return nil
 }
 
-func (s *Sender) CloseMined() {
+func (s *Sender) CloseMined() error {
+	if s.State.Status != StatusClosing {
+		return ErrNotStatusClosing
+	}
 	s.State.Status = StatusClosed
+	return nil
 }
 
-func (r *Receiver) CloseMined() {
+func (r *Receiver) CloseMined() error {
+	if r.State.Status != StatusClosing {
+		return ErrNotStatusClosing
+	}
 	r.State.Status = StatusClosed
+	return nil
 }
 
 func (s *Sender) Refund() ([]byte, error) {
