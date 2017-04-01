@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcutil/hdkeychain"
 
 	"moonchan/receiver"
+	"moonchan/resolver"
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
@@ -103,7 +104,7 @@ func main() {
 	http.HandleFunc("/payments", wrap(ss, paymentsHandler))
 
 	if *externalURL != "" {
-		http.HandleFunc("/moonchan.json", domainHandler)
+		http.HandleFunc(resolver.MoonbeamPath, domainHandler)
 	}
 
 	http.HandleFunc(rpcPath, wrap(ss, rpcHandler))

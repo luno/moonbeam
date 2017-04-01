@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const MoonbeamPath = "/moonbeam.json"
+
 type DomainReceiver struct {
 	URL string `json:"url"`
 }
@@ -39,7 +41,7 @@ func (r *Resolver) Resolve(domain string) (*url.URL, error) {
 	var rurl url.URL
 	rurl.Scheme = "https"
 	rurl.Host = domain
-	rurl.Path = "/moonchan.json"
+	rurl.Path = MoonbeamPath
 
 	if r.DefaultPort != 0 {
 		rurl.Host += ":" + strconv.Itoa(r.DefaultPort)
