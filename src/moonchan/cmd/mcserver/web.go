@@ -248,7 +248,7 @@ func paymentsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 func domainHandler(w http.ResponseWriter, r *http.Request) {
 	d := resolver.Domain{
 		Receivers: []resolver.DomainReceiver{
-			{URL: *externalURL},
+			{URL: *externalURL + rpcPath},
 		},
 	}
 	json.NewEncoder(w).Encode(d)
