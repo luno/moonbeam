@@ -106,10 +106,8 @@ func main() {
 		http.HandleFunc("/moonchan.json", domainHandler)
 	}
 
-	http.HandleFunc("/api/create", wrap(ss, rpcCreateHandler))
-	http.HandleFunc("/api/open", wrap(ss, rpcOpenHandler))
-	http.HandleFunc("/api/send", wrap(ss, rpcSendHandler))
-	http.HandleFunc("/api/close", wrap(ss, rpcCloseHandler))
+	http.HandleFunc(rpcPath, wrap(ss, rpcHandler))
+	http.HandleFunc(rpcPath+"/", wrap(ss, rpcHandler))
 
 	if *tlsCert == "" {
 		log.Fatal(http.ListenAndServe(*listenAddr, nil))

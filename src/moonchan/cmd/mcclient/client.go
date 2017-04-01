@@ -74,7 +74,7 @@ func getHttpClient() *http.Client {
 	}
 }
 
-func getClient(id string) *client.Client {
+func getClient(id string) (*client.Client, error) {
 	host := globalState.Channels[id].Host
 	c := getHttpClient()
 	return client.NewClient(c, host)
@@ -115,13 +115,20 @@ func create(args []string) error {
 	}
 
 	httpClient := getHttpClient()
-	c := client.NewClient(httpClient, host)
+	c, err := client.NewClient(httpClient, host)
+	if err != nil {
+		return err
+	}
 	var req models.CreateRequest
 	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
 	req.SenderOutput = s.State.SenderOutput
 	resp, err := c.Create(req)
 	if err != nil {
 		return err
+	}
+
+	if !models.ValidateChannelID(resp.ID) {
+		return errors.New("invalid channel ID")
 	}
 
 	receiverPubKey, err := btcutil.NewAddressPubKey(resp.ReceiverPubKey, net)
@@ -192,7 +199,10 @@ func fund(args []string) error {
 		return err
 	}
 
-	c := getClient(id)
+	c, err := getClient(id)
+	if err != nil {
+		return err
+	}
 	req := models.OpenRequest{
 		ID:        ch.RemoteID,
 		TxID:      txid,
@@ -239,7 +249,10 @@ func send(args []string) error {
 		return err
 	}
 
-	c := getClient(id)
+	c, err := getClient(id)
+	if err != nil {
+		return err
+	}
 	req := models.SendRequest{
 		ID:        ch.RemoteID,
 		Amount:    amount,
@@ -265,7 +278,10 @@ func closeAction(args []string) error {
 		return err
 	}
 
-	c := getClient(id)
+	c, err := getClient(id)
+	if err != nil {
+		return err
+	}
 	req := models.CloseRequest{
 		ID: ch.RemoteID,
 	}

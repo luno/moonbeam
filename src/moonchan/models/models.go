@@ -1,5 +1,9 @@
 package models
 
+import (
+	"encoding/base64"
+)
+
 type CreateRequest struct {
 	SenderPubKey []byte `json:"senderPubKey"`
 	SenderOutput string `json:"senderOutput"`
@@ -47,4 +51,17 @@ type CloseRequest struct {
 
 type CloseResponse struct {
 	CloseTx []byte `json:"closeTx"`
+}
+
+type StatusResponse struct {
+	Status  int   `json:”status”`
+	Balance int64 `json:”balance”`
+}
+
+func ValidateChannelID(s string) bool {
+	if len(s) == 0 || len(s) > 64 {
+		return false
+	}
+	_, err := base64.RawURLEncoding.DecodeString(s)
+	return err == nil
 }
