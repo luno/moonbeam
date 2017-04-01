@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
+	"moonchan/address"
 	"moonchan/channels"
 	"moonchan/client"
 	"moonchan/models"
@@ -228,9 +229,9 @@ func send(args []string) error {
 	}
 
 	if id == "" {
-		_, domain, err := resolver.ParseAddress(target)
-		if err != nil {
-			return err
+		_, domain, valid := address.Decode(target)
+		if !valid {
+			return errors.New("invalid address")
 		}
 		ids := findForDomain(domain)
 		if len(ids) == 0 {

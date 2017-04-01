@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 )
 
 const MoonbeamPath = "/moonbeam.json"
@@ -67,26 +66,4 @@ func (r *Resolver) Resolve(domain string) (*url.URL, error) {
 	}
 
 	return url.Parse(d.Receivers[0].URL)
-}
-
-var errInvalidAddress = errors.New("invalid address")
-
-func ParseAddress(addr string) (string, string, error) {
-	addr = strings.ToLower(addr)
-	i := strings.Index(addr, "@")
-	if i <= 0 {
-		return "", "", errInvalidAddress
-	}
-
-	username := addr[:i]
-	domain := addr[i+1:]
-
-	if username == "" {
-		return "", "", errInvalidAddress
-	}
-	if domain == "" {
-		return "", "", errInvalidAddress
-	}
-
-	return username, domain, nil
 }
