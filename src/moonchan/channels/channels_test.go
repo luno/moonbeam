@@ -365,3 +365,39 @@ func TestCapacityTooLow(t *testing.T) {
 		t.Errorf("Wrong status: %s", r.State.Status)
 	}
 }
+
+func TestValidateAmount(t *testing.T) {
+	var s SharedState
+	s.Balance = 1000
+	s.Capacity = 100000
+	s.Fee = 100
+
+	if nb, err := s.validateAmount(100); nb != 1100 || err != nil {
+		t.Errorf("Unexpected result: %d", nb)
+	}
+
+	if nb, err := s.validateAmount(98900); nb != 99900 || err != nil {
+		t.Errorf("Unexpected result: %d", nb)
+	}
+
+	if _, err := s.validateAmount(0); err != ErrAmountTooSmall {
+		t.Errorf("Expected ErrAmountTooSmall, got: %v", err)
+	}
+
+	if _, err := s.validateAmount(-100); err != ErrAmountTooSmall {
+		t.Errorf("Expected ErrAmountTooSmall, got: %v", err)
+	}
+
+	if _, err := s.validateAmount(98901); err != ErrInsufficientCapacity {
+		t.Errorf("Expected ErrInsufficientCapacity, got: %v", err)
+	}
+
+	if _, err := s.validateAmount(s.Capacity); err != ErrInsufficientCapacity {
+		t.Errorf("Expected ErrInsufficientCapacity, got: %v", err)
+	}
+
+	// Overflow
+	if _, err := s.validateAmount(1<<63 - 100); err != ErrInsufficientCapacity {
+		t.Errorf("Expected ErrInsufficientCapacity, got: %v", err)
+	}
+}

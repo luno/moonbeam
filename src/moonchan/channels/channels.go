@@ -66,19 +66,25 @@ type SharedState struct {
 	SenderSig []byte
 }
 
+var ErrAmountTooSmall = errors.New("amount is too small")
+var ErrInsufficientCapacity = errors.New("amount exceeds channel capacity")
+
 func (ss *SharedState) validateAmount(amount int64) (int64, error) {
 	if amount <= 0 {
-		return ss.Balance, errors.New("amount must be positive")
+		return ss.Balance, ErrAmountTooSmall
+	}
+	if amount > ss.Capacity {
+		return ss.Balance, ErrInsufficientCapacity
 	}
 
 	newBalance := ss.Balance + amount
 
 	if newBalance < dustThreshold {
-		return ss.Balance, errors.New("amount is too small")
+		return ss.Balance, ErrAmountTooSmall
 	}
 
 	if newBalance+ss.Fee > ss.Capacity {
-		return ss.Balance, errors.New("insufficient channel capacity")
+		return ss.Balance, ErrInsufficientCapacity
 	}
 
 	return newBalance, nil
