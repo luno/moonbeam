@@ -299,6 +299,32 @@ func closeAction(args []string) error {
 	return storeChannel(id, sender.State)
 }
 
+func status(args []string) error {
+	id := args[0]
+
+	ch, _, err := getChannel(id)
+	if err != nil {
+		return err
+	}
+
+	c, err := getClient(id)
+	if err != nil {
+		return err
+	}
+	req := models.StatusRequest{
+		ID: ch.RemoteID,
+	}
+	resp, err := c.Status(req)
+	if err != nil {
+		return err
+	}
+
+	buf, _ := json.MarshalIndent(resp, "", "    ")
+	fmt.Printf("%s\n", string(buf))
+
+	return nil
+}
+
 func refund(args []string) error {
 	id := args[0]
 
@@ -388,6 +414,7 @@ var commands = map[string]func(args []string) error{
 	"refund": refund,
 	"list":   list,
 	"show":   show,
+	"status": status,
 }
 
 var helps = map[string]string{
@@ -398,6 +425,7 @@ var helps = map[string]string{
 	"refund": "Show the refund transaction for a channel",
 	"list":   "List channels",
 	"show":   "Show info about a channel",
+	"status": "Get status from server",
 	"help":   "Show help",
 }
 

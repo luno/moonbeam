@@ -53,9 +53,13 @@ type CloseResponse struct {
 	CloseTx []byte `json:"closeTx"`
 }
 
+type StatusRequest struct {
+	ID string `json:"id"`
+}
+
 type StatusResponse struct {
-	Status  int   `json:”status”`
-	Balance int64 `json:”balance”`
+	Status  int   `json:"status"`
+	Balance int64 `json:"balance"`
 }
 
 func ValidateChannelID(s string) bool {

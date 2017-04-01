@@ -46,6 +46,11 @@ var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 </html>`))
 
 func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
 	c := struct {
 	}{}
 	render(indexT, w, c)

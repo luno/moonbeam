@@ -98,6 +98,18 @@ func rpcCloseHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id 
 	respond(w, r, resp, err)
 }
 
+func rpcStatusHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+	var req models.StatusRequest
+	if !parse(w, r, &req) {
+		return
+	}
+	if !checkID(w, req.ID, id) {
+		return
+	}
+	resp, err := s.Receiver.Status(req)
+	respond(w, r, resp, err)
+}
+
 const rpcPath = "/moonbeamrpc"
 
 func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
@@ -108,7 +120,7 @@ func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if path == rpcPath {
-		if r.Method == "POST" {
+		if r.Method == http.MethodPost {
 			rpcCreateHandler(s, w, r)
 			return
 		}
@@ -124,12 +136,14 @@ func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "PATCH":
+	case http.MethodPatch:
 		rpcOpenHandler(s, w, r, id)
-	case "POST":
+	case http.MethodPost:
 		rpcSendHandler(s, w, r, id)
-	case "DELETE":
+	case http.MethodDelete:
 		rpcCloseHandler(s, w, r, id)
+	case http.MethodGet:
+		rpcStatusHandler(s, w, r, id)
 	default:
 		http.Error(w, "", http.StatusMethodNotAllowed)
 	}

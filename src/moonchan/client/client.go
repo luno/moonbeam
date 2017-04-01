@@ -80,7 +80,7 @@ func (c *Client) do(method, id string, req, resp interface{}) error {
 
 func (c *Client) Create(req models.CreateRequest) (*models.CreateResponse, error) {
 	var resp models.CreateResponse
-	if err := c.do("POST", "", req, &resp); err != nil {
+	if err := c.do(http.MethodPost, "", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -88,7 +88,7 @@ func (c *Client) Create(req models.CreateRequest) (*models.CreateResponse, error
 
 func (c *Client) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	var resp models.OpenResponse
-	if err := c.do("PATCH", req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodPatch, req.ID, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -96,7 +96,7 @@ func (c *Client) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 
 func (c *Client) Send(req models.SendRequest) (*models.SendResponse, error) {
 	var resp models.SendResponse
-	if err := c.do("POST", req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodPost, req.ID, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -104,7 +104,15 @@ func (c *Client) Send(req models.SendRequest) (*models.SendResponse, error) {
 
 func (c *Client) Close(req models.CloseRequest) (*models.CloseResponse, error) {
 	var resp models.CloseResponse
-	if err := c.do("DELETE", req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodDelete, req.ID, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) Status(req models.StatusRequest) (*models.StatusResponse, error) {
+	var resp models.StatusResponse
+	if err := c.do(http.MethodGet, req.ID, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

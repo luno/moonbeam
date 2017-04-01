@@ -335,3 +335,15 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	return &models.CloseResponse{rawTx}, nil
 }
+
+func (r *Receiver) Status(req models.StatusRequest) (*models.StatusResponse, error) {
+	c, err := r.get(req.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.StatusResponse{
+		Status:  int(c.State.Status),
+		Balance: c.State.Balance,
+	}, nil
+}
