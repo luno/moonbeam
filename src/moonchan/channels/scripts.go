@@ -13,7 +13,7 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
-// Typical close tx size: 369 bytes
+// Typical close tx size: 418 bytes
 // Typical refund tx size: 297 bytes
 
 const dustThreshold = 546
@@ -100,7 +100,20 @@ func sendToAddress(net *chaincfg.Params, amount int64, addr string) (*wire.TxOut
 	}, nil
 }
 
-func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
+func getDataOutput(hash [32]byte) (*wire.TxOut, error) {
+	data := append([]byte{1}, hash[:]...)
+	dataScript, err := txscript.NullDataScript(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wire.TxOut{
+		Value:    1,
+		PkScript: dataScript,
+	}, nil
+}
+
+func (s *SharedState) GetClosureTx(balance int64, hash [32]byte) (*wire.MsgTx, error) {
 	net, err := s.GetNet()
 	if err != nil {
 		return nil, err
@@ -113,6 +126,12 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	dataout, err := getDataOutput(hash)
+	if err != nil {
+		return nil, err
+	}
+	tx.AddTxOut(dataout)
 
 	if receiveAmount >= dustThreshold {
 		txout, err := sendToAddress(net, receiveAmount, s.ReceiverOutput)
@@ -133,8 +152,8 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	return tx, nil
 }
 
-func (s *SharedState) GetClosureTxSigned(balance int64, senderSig []byte, privKey *btcec.PrivateKey) ([]byte, error) {
-	tx, err := s.GetClosureTx(balance)
+func (s *SharedState) GetClosureTxSigned(balance int64, hash [32]byte, senderSig []byte, privKey *btcec.PrivateKey) ([]byte, error) {
+	tx, err := s.GetClosureTx(balance, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -276,13 +295,19 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 		return errors.New("tx too big")
 	}
 	for _, txout := range tx.TxOut {
-		if txout.Value < dustThreshold {
-			return errors.New("dust output")
+		if txout.Value <= 0 {
+			return errors.New("output value not positive")
 		}
 
 		sc := txscript.GetScriptClass(txout.PkScript)
-		if sc != txscript.PubKeyHashTy && sc != txscript.ScriptHashTy {
+		if sc != txscript.PubKeyHashTy && sc != txscript.ScriptHashTy && sc != txscript.NullDataTy {
 			return errors.New("unsupported tx out script class")
+		}
+
+		if sc != txscript.NullDataTy {
+			if txout.Value < dustThreshold {
+				return errors.New("dust output")
+			}
 		}
 	}
 

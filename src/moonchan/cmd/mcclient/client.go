@@ -251,7 +251,7 @@ func send(args []string) error {
 		return err
 	}
 
-	if _, err := sender.PrepareSend(p.Amount); err != nil {
+	if _, err := sender.PrepareSend(p.Amount, payment); err != nil {
 		return err
 	}
 
@@ -302,7 +302,7 @@ func flush(id string) error {
 		return err
 	}
 
-	sig, err := sender.PrepareSend(p.Amount)
+	sig, err := sender.PrepareSend(p.Amount, payment)
 	if err != nil {
 		return err
 	}

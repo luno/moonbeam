@@ -224,7 +224,7 @@ func (s *Sender) FundingTxMined(txid string, vout uint32, amount int64, height i
 	s.State.BlockHeight = height
 	s.State.Status = StatusOpen
 
-	return s.signBalance(0)
+	return s.signBalance(0, s.State.PaymentsHash)
 }
 
 func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, senderSig []byte) error {
@@ -242,7 +242,7 @@ func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, send
 	r.State.Capacity = amount
 	r.State.BlockHeight = height
 
-	if err := r.validateSenderSig(0, senderSig); err != nil {
+	if err := r.validateSenderSig(0, r.State.PaymentsHash, senderSig); err != nil {
 		return err
 	}
 
@@ -252,8 +252,8 @@ func (r *Receiver) Open(txid string, vout uint32, amount int64, height int, send
 	return nil
 }
 
-func (s *Sender) signBalance(balance int64) ([]byte, error) {
-	tx, err := s.State.GetClosureTx(balance)
+func (s *Sender) signBalance(balance int64, hash [32]byte) ([]byte, error) {
+	tx, err := s.State.GetClosureTx(balance, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (s *Sender) signBalance(balance int64) ([]byte, error) {
 		tx, 0, script, txscript.SigHashAll, s.PrivKey)
 }
 
-func (s *Sender) PrepareSend(amount int64) ([]byte, error) {
+func (s *Sender) PrepareSend(amount int64, payment []byte) ([]byte, error) {
 	if s.State.Status != StatusOpen {
 		return nil, ErrNotStatusOpen
 	}
@@ -276,11 +276,18 @@ func (s *Sender) PrepareSend(amount int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.signBalance(newBalance)
+
+	if !validatePaymentSize(len(payment)) {
+		return nil, errors.New("invalid payment")
+	}
+
+	newHash := chainHash(s.State.PaymentsHash, payment)
+
+	return s.signBalance(newBalance, newHash)
 }
 
-func (r *Receiver) validateSenderSig(balance int64, senderSig []byte) error {
-	rawTx, err := r.State.GetClosureTxSigned(balance, senderSig, r.PrivKey)
+func (r *Receiver) validateSenderSig(balance int64, hash [32]byte, senderSig []byte) error {
+	rawTx, err := r.State.GetClosureTxSigned(balance, hash, senderSig, r.PrivKey)
 	if err != nil {
 		return err
 	}
@@ -325,7 +332,7 @@ func (r *Receiver) Send(amount int64, payment, senderSig []byte) error {
 
 	newHash := chainHash(r.State.PaymentsHash, payment)
 
-	if err := r.validateSenderSig(newBalance, senderSig); err != nil {
+	if err := r.validateSenderSig(newBalance, newHash, senderSig); err != nil {
 		return err
 	}
 
@@ -364,7 +371,7 @@ func (r *Receiver) Close() ([]byte, error) {
 		return nil, ErrNotStatusOpen
 	}
 
-	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.State.SenderSig, r.PrivKey)
+	rawTx, err := r.State.GetClosureTxSigned(r.State.Balance, r.State.PaymentsHash, r.State.SenderSig, r.PrivKey)
 	if err != nil {
 		return nil, err
 	}

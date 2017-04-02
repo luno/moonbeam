@@ -182,7 +182,7 @@ func TestSend(t *testing.T) {
 
 	const amount = 1000
 
-	sig, err = s.PrepareSend(amount)
+	sig, err = s.PrepareSend(amount, testPayment)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestSend(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sig, err = s.PrepareSend(amount * 2)
+	sig, err = s.PrepareSend(amount*2, testPayment)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestInvalidSendSig(t *testing.T) {
 		t.Errorf("Expected error due invalid signature")
 	}
 
-	sig, err = s.PrepareSend(amount * 2)
+	sig, err = s.PrepareSend(amount*2, testPayment)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,12 +319,13 @@ func TestSendDust(t *testing.T) {
 
 	const amount = 100
 
-	sig, err = s.PrepareSend(amount)
+	sig, err = s.PrepareSend(amount, testPayment)
 	if err == nil {
 		t.Errorf("Expected error due to amount too small")
 	}
 
-	sig, err = s.signBalance(amount)
+	newHash := chainHash(s.State.PaymentsHash, testPayment)
+	sig, err = s.signBalance(amount, newHash)
 	if err != nil {
 		t.Fatal(err)
 	}
