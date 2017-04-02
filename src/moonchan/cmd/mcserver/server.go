@@ -12,6 +12,7 @@ import (
 
 	"moonchan/receiver"
 	"moonchan/resolver"
+	"moonchan/storage/filesystem"
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
@@ -22,6 +23,7 @@ var bitcoindUsername = flag.String("bitcoind_username", "username", "")
 var bitcoindPassword = flag.String("bitcoind_password", "password", "")
 var listenAddr = flag.String("listen", ":3211", "Address to listen on")
 var externalURL = flag.String("external_url", "https://example.com:3211", "External server URL")
+var domain = flag.String("domain", "example.com", "Domain to accept payments for")
 var tlsCert = flag.String("tls_cert", "tls/cert.pem", "TLS certificate")
 var tlsKey = flag.String("tls_key", "tls/key.pem", "TLS key")
 
@@ -85,13 +87,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	storage := filesystem.NewFilesystemStorage("server-state.json")
+
 	bc, err := bitcoinClient()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer bc.Shutdown()
 
-	s := receiver.NewReceiver(net, ek, bc, *destination)
+	dir := receiver.NewDirectory(*domain)
+	s := receiver.NewReceiver(net, ek, bc, storage, dir, *destination)
 
 	go s.WatchBlockchainForever()
 

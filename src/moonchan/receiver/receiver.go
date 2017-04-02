@@ -19,7 +19,6 @@ import (
 	"moonchan/channels"
 	"moonchan/models"
 	"moonchan/storage"
-	"moonchan/storage/filesystem"
 )
 
 type Receiver struct {
@@ -27,17 +26,23 @@ type Receiver struct {
 	ek             *hdkeychain.ExtendedKey
 	bc             *btcrpcclient.Client
 	db             storage.Storage
+	dir            *Directory
 	receiverOutput string
 }
 
-func NewReceiver(net *chaincfg.Params, ek *hdkeychain.ExtendedKey, bc *btcrpcclient.Client, destination string) *Receiver {
-	ms := filesystem.NewFilesystemStorage("server-state.json")
+func NewReceiver(net *chaincfg.Params,
+	ek *hdkeychain.ExtendedKey,
+	bc *btcrpcclient.Client,
+	db storage.Storage,
+	dir *Directory,
+	destination string) *Receiver {
 
 	return &Receiver{
 		Net:            net,
 		ek:             ek,
 		bc:             bc,
-		db:             ms,
+		db:             db,
+		dir:            dir,
 		receiverOutput: destination,
 	}
 }
@@ -264,17 +269,25 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	return &models.OpenResponse{}, nil
 }
 
+func (r *Receiver) validate(c *channels.Receiver, p models.Payment) (bool, error) {
+	if !c.Validate(p.Amount) {
+		return false, nil
+	}
+	return r.dir.HasTarget(p.Target)
+}
+
 func (r *Receiver) Validate(req models.ValidateRequest) (*models.ValidateResponse, error) {
 	c, err := r.get(req.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	valid := c.Validate(req.Payment.Amount)
+	valid, err := r.validate(c, req.Payment)
+	if err != nil {
+		return nil, err
+	}
 
-	return &models.ValidateResponse{
-		Valid: valid,
-	}, nil
+	return &models.ValidateResponse{Valid: valid}, nil
 }
 
 func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
@@ -285,6 +298,14 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 	prev, err := c.State.ToSimple()
 	if err != nil {
 		return nil, err
+	}
+
+	valid, err := r.validate(c, req.Payment)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
+		return nil, errors.New("invalid payment")
 	}
 
 	if err := c.Send(req.Payment.Amount, req.SenderSig); err != nil {
