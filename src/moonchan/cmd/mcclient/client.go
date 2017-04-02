@@ -245,30 +245,96 @@ func send(args []string) error {
 		return err
 	}
 
-	sig, err := sender.PrepareSend(amount)
+	p := Payment{
+		Amount: amount,
+		Target: target,
+	}
+
+	if _, err := sender.PrepareSend(p.Amount); err != nil {
+		return err
+	}
+
+	if ch.PendingPayment != nil {
+		return errors.New("there is already a pending payment")
+	}
+	if err := storePendingPayment(id, sender.State, &p); err != nil {
+		return err
+	}
+	if err := save(getNet(), globalState); err != nil {
+		return err
+	}
+
+	return flush(id)
+}
+
+func flush(id string) error {
+	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
+
+	if ch.PendingPayment == nil {
+		fmt.Println("No pending payment to flush.")
+		return nil
+	}
+	p := ch.PendingPayment
+
+	sig, err := sender.PrepareSend(p.Amount)
+	if err != nil {
+		return err
+	}
+
+	// Either the payment has been sent or it hasn't. Find out which one.
 
 	c, err := getClient(id)
 	if err != nil {
 		return err
 	}
-	req := models.SendRequest{
-		ID:        ch.RemoteID,
-		Amount:    amount,
-		SenderSig: sig,
-		Target:    target,
+	req := models.StatusRequest{
+		ID: ch.RemoteID,
 	}
-	if _, err := c.Send(req); err != nil {
+	resp, err := c.Status(req)
+	if err != nil {
 		return err
 	}
 
-	if err := sender.SendAccepted(amount); err != nil {
-		return err
-	}
+	serverBal := resp.Balance
 
-	return storeChannel(id, sender.State)
+	if serverBal == sender.State.Balance {
+		// Pending payment doesn't reflect yet. We have to retry.
+
+		req := models.SendRequest{
+			ID:        ch.RemoteID,
+			Amount:    p.Amount,
+			SenderSig: sig,
+			Target:    p.Target,
+		}
+		if _, err := c.Send(req); err != nil {
+			return err
+		}
+
+		if err := sender.SendAccepted(p.Amount); err != nil {
+			return err
+		}
+
+		return storePendingPayment(id, sender.State, nil)
+
+	} else if serverBal == sender.State.Balance+ch.PendingPayment.Amount {
+		// Pending payment reflects. Finalize our side.
+
+		if err := sender.SendAccepted(p.Amount); err != nil {
+			return err
+		}
+
+		return storePendingPayment(id, sender.State, nil)
+
+	} else {
+		return errors.New("unexpected remote channel balance")
+	}
+}
+
+func flushAction(args []string) error {
+	return flush(args[0])
 }
 
 func closeAction(args []string) error {
@@ -416,6 +482,7 @@ var commands = map[string]func(args []string) error{
 	"list":   list,
 	"show":   show,
 	"status": status,
+	"flush":  flushAction,
 }
 
 var helps = map[string]string{
@@ -427,6 +494,7 @@ var helps = map[string]string{
 	"list":   "List channels",
 	"show":   "Show info about a channel",
 	"status": "Get status from server",
+	"flush":  "Flush any pending payment",
 	"help":   "Show help",
 }
 

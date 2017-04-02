@@ -13,12 +13,20 @@ import (
 	"moonchan/channels"
 )
 
+type Payment struct {
+	Amount int64
+	Target string
+}
+
 type Channel struct {
 	Domain   string
 	Host     string
-	State    channels.SimpleSharedState
 	KeyPath  int
 	RemoteID string
+
+	PendingPayment *Payment
+
+	State channels.SimpleSharedState
 }
 
 type State struct {
@@ -145,6 +153,21 @@ func storeChannel(id string, state channels.SharedState) error {
 		return errors.New("channel does not exist")
 	}
 	c.State = *newState
+	globalState.Channels[id] = c
+	return nil
+}
+
+func storePendingPayment(id string, state channels.SharedState, p *Payment) error {
+	newState, err := state.ToSimple()
+	if err != nil {
+		return err
+	}
+	c, ok := globalState.Channels[id]
+	if !ok {
+		return errors.New("channel does not exist")
+	}
+	c.State = *newState
+	c.PendingPayment = p
 	globalState.Channels[id] = c
 	return nil
 }
