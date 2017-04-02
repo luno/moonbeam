@@ -63,8 +63,8 @@ func (r *Receiver) List() ([]storage.Record, error) {
 	return r.db.List()
 }
 
-func (r *Receiver) ListPayments() ([]storage.Payment, error) {
-	return r.db.ListPayments()
+func (r *Receiver) ListPayments(channelID string) ([][]byte, error) {
+	return r.db.ListPayments(channelID)
 }
 
 func (r *Receiver) getKey(n int) (*btcec.PrivateKey, error) {
@@ -240,7 +240,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 
 	newState := c.State
 
-	if err := r.db.Update(req.ID, prevState, newState); err != nil {
+	if err := r.db.Update(req.ID, prevState, newState, nil); err != nil {
 		return nil, err
 	}
 
@@ -300,14 +300,9 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		return nil, err
 	}
 
-	p2 := storage.Payment{
-		Target: p.Target,
-		Amount: p.Amount,
-	}
-
 	newState := c.State
 
-	if err := r.db.Send(req.ID, prevState, newState, p2); err != nil {
+	if err := r.db.Update(req.ID, prevState, newState, req.Payment); err != nil {
 		return nil, err
 	}
 
@@ -330,7 +325,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	newState := c.State
 
-	if err := r.db.Update(req.ID, prevState, newState); err != nil {
+	if err := r.db.Update(req.ID, prevState, newState, nil); err != nil {
 		return nil, err
 	}
 

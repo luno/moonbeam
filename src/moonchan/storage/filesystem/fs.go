@@ -13,13 +13,13 @@ import (
 type data struct {
 	KeyPathCounter int
 	Channels       map[string]storage.Record
-	Payments       []storage.Payment
+	Payments       map[string][][]byte
 }
 
 func newData() *data {
 	return &data{
 		Channels: make(map[string]storage.Record),
-		Payments: []storage.Payment{},
+		Payments: make(map[string][][]byte),
 	}
 }
 
@@ -135,10 +135,13 @@ func (fs *FilesystemStorage) Create(rec storage.Record) error {
 
 func checkSame(d *data, id string, prev channels.SharedState) bool {
 	s := d.Channels[id].SharedState
-	return s.Status == prev.Status && s.Count == prev.Count
+	return s.Status == prev.Status &&
+		s.Count == prev.Count &&
+		s.Balance == prev.Balance &&
+		s.PaymentsHash == prev.PaymentsHash
 }
 
-func (fs *FilesystemStorage) Update(id string, prev, new channels.SharedState) error {
+func (fs *FilesystemStorage) Update(id string, prev, new channels.SharedState, payment []byte) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
@@ -158,31 +161,9 @@ func (fs *FilesystemStorage) Update(id string, prev, new channels.SharedState) e
 	rec := d.Channels[id]
 	rec.SharedState = new
 	d.Channels[id] = rec
-
-	return fs.save(d)
-}
-
-func (fs *FilesystemStorage) Send(id string, prev, new channels.SharedState, p storage.Payment) error {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
-
-	d, err := fs.load()
-	if err != nil {
-		return err
+	if payment != nil {
+		d.Payments[id] = append(d.Payments[id], payment)
 	}
-
-	if _, ok := d.Channels[id]; !ok {
-		return storage.ErrNotFound
-	}
-
-	if !checkSame(d, id, prev) {
-		return storage.ErrConcurrentUpdate
-	}
-
-	rec := d.Channels[id]
-	rec.SharedState = new
-	d.Channels[id] = rec
-	d.Payments = append(d.Payments, p)
 
 	return fs.save(d)
 }
@@ -201,7 +182,7 @@ func (fs *FilesystemStorage) ReserveKeyPath() (int, error) {
 	return d.KeyPathCounter, fs.save(d)
 }
 
-func (fs *FilesystemStorage) ListPayments() ([]storage.Payment, error) {
+func (fs *FilesystemStorage) ListPayments(channelID string) ([][]byte, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
@@ -210,7 +191,7 @@ func (fs *FilesystemStorage) ListPayments() ([]storage.Payment, error) {
 		return nil, err
 	}
 
-	return d.Payments, nil
+	return d.Payments[channelID], nil
 }
 
 // Make sure FilesystemStorage implements Storage.

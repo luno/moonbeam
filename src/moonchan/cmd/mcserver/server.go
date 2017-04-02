@@ -106,7 +106,6 @@ func main() {
 	http.HandleFunc("/channels", wrap(ss, channelsHandler))
 	http.HandleFunc("/details", wrap(ss, detailsHandler))
 	http.HandleFunc("/close", wrap(ss, closeHandler))
-	http.HandleFunc("/payments", wrap(ss, paymentsHandler))
 
 	if *externalURL != "" {
 		http.HandleFunc(resolver.MoonbeamPath, domainHandler)
