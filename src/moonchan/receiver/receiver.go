@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log"
 
@@ -246,11 +247,24 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	return &models.OpenResponse{}, nil
 }
 
-func (r *Receiver) validate(c *channels.Receiver, p models.Payment) (bool, error) {
-	if !c.Validate(p.Amount) {
-		return false, nil
+func (r *Receiver) validate(c *channels.Receiver, payment []byte) (bool, *models.Payment, error) {
+	var p models.Payment
+	if err := json.Unmarshal(payment, &p); err != nil {
+		return false, nil, errors.New("invalid payment")
 	}
-	return r.dir.HasTarget(p.Target)
+
+	if !c.Validate(p.Amount, payment) {
+		return false, nil, nil
+	}
+	has, err := r.dir.HasTarget(p.Target)
+	if err != nil {
+		return false, nil, err
+	}
+	if !has {
+		return false, nil, nil
+	}
+
+	return true, &p, nil
 }
 
 func (r *Receiver) Validate(req models.ValidateRequest) (*models.ValidateResponse, error) {
@@ -259,7 +273,7 @@ func (r *Receiver) Validate(req models.ValidateRequest) (*models.ValidateRespons
 		return nil, err
 	}
 
-	valid, err := r.validate(c, req.Payment)
+	valid, _, err := r.validate(c, req.Payment)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +288,7 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 	}
 	prevState := c.State
 
-	valid, err := r.validate(c, req.Payment)
+	valid, p, err := r.validate(c, req.Payment)
 	if err != nil {
 		return nil, err
 	}
@@ -282,18 +296,18 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		return nil, errors.New("invalid payment")
 	}
 
-	if err := c.Send(req.Payment.Amount, req.SenderSig); err != nil {
+	if err := c.Send(p.Amount, req.Payment, req.SenderSig); err != nil {
 		return nil, err
 	}
 
-	p := storage.Payment{
-		Target: req.Payment.Target,
-		Amount: req.Payment.Amount,
+	p2 := storage.Payment{
+		Target: p.Target,
+		Amount: p.Amount,
 	}
 
 	newState := c.State
 
-	if err := r.db.Send(req.ID, prevState, newState, p); err != nil {
+	if err := r.db.Send(req.ID, prevState, newState, p2); err != nil {
 		return nil, err
 	}
 

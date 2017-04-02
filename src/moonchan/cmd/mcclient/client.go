@@ -245,6 +245,10 @@ func send(args []string) error {
 		Amount: amount,
 		Target: target,
 	}
+	payment, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
 
 	if _, err := sender.PrepareSend(p.Amount); err != nil {
 		return err
@@ -260,7 +264,7 @@ func send(args []string) error {
 	}
 	req := models.ValidateRequest{
 		ID:      ch.RemoteID,
-		Payment: p,
+		Payment: payment,
 	}
 	resp, err := c.Validate(req)
 	if err != nil {
@@ -270,7 +274,7 @@ func send(args []string) error {
 		return errors.New("payment rejected by server")
 	}
 
-	if err := storePendingPayment(id, sender.State, &p); err != nil {
+	if err := storePendingPayment(id, sender.State, payment); err != nil {
 		return err
 	}
 	if err := save(getNet(), globalState); err != nil {
@@ -286,10 +290,15 @@ func flush(id string) error {
 		return err
 	}
 
-	p := ch.PendingPayment
-	if p == nil {
+	payment := ch.PendingPayment
+	if payment == nil {
 		fmt.Println("No pending payment to flush.")
 		return nil
+	}
+
+	var p models.Payment
+	if err := json.Unmarshal(payment, &p); err != nil {
+		return err
 	}
 
 	sig, err := sender.PrepareSend(p.Amount)
@@ -318,23 +327,23 @@ func flush(id string) error {
 
 		req := models.SendRequest{
 			ID:        ch.RemoteID,
-			Payment:   *p,
+			Payment:   payment,
 			SenderSig: sig,
 		}
 		if _, err := c.Send(req); err != nil {
 			return err
 		}
 
-		if err := sender.SendAccepted(p.Amount); err != nil {
+		if err := sender.SendAccepted(p.Amount, payment); err != nil {
 			return err
 		}
 
 		return storePendingPayment(id, sender.State, nil)
 
-	} else if serverBal == sender.State.Balance+ch.PendingPayment.Amount {
+	} else if serverBal == sender.State.Balance+p.Amount {
 		// Pending payment reflects. Finalize our side.
 
-		if err := sender.SendAccepted(p.Amount); err != nil {
+		if err := sender.SendAccepted(p.Amount, payment); err != nil {
 			return err
 		}
 

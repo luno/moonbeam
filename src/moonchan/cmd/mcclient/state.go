@@ -11,7 +11,6 @@ import (
 	"github.com/btcsuite/btcutil/hdkeychain"
 
 	"moonchan/channels"
-	"moonchan/models"
 )
 
 type Channel struct {
@@ -20,7 +19,7 @@ type Channel struct {
 	KeyPath  int
 	RemoteID string
 
-	PendingPayment *models.Payment
+	PendingPayment []byte
 
 	State channels.SharedState
 }
@@ -145,7 +144,7 @@ func storeChannel(id string, state channels.SharedState) error {
 	return nil
 }
 
-func storePendingPayment(id string, state channels.SharedState, p *models.Payment) error {
+func storePendingPayment(id string, state channels.SharedState, p []byte) error {
 	c, ok := globalState.Channels[id]
 	if !ok {
 		return errors.New("channel does not exist")

@@ -293,7 +293,7 @@ func (r *Receiver) validateSenderSig(balance int64, senderSig []byte) error {
 	return nil
 }
 
-func (r *Receiver) Validate(amount int64) bool {
+func (r *Receiver) Validate(amount int64, payment []byte) bool {
 	if r.State.Status != StatusOpen {
 		return false
 	}
@@ -302,12 +302,20 @@ func (r *Receiver) Validate(amount int64) bool {
 		return false
 	}
 
+	if !validatePaymentSize(len(payment)) {
+		return false
+	}
+
 	return true
 }
 
-func (r *Receiver) Send(amount int64, senderSig []byte) error {
+func (r *Receiver) Send(amount int64, payment, senderSig []byte) error {
 	if r.State.Status != StatusOpen {
 		return ErrNotStatusOpen
+	}
+
+	if !r.Validate(amount, payment) {
+		return errors.New("invalid payment")
 	}
 
 	newBalance, err := r.State.validateAmount(amount)
@@ -322,17 +330,19 @@ func (r *Receiver) Send(amount int64, senderSig []byte) error {
 	r.State.Count++
 	r.State.Balance = newBalance
 	r.State.SenderSig = senderSig
+	r.State.Payments = append(r.State.Payments, payment)
 
 	return nil
 }
 
-func (s *Sender) SendAccepted(amount int64) error {
+func (s *Sender) SendAccepted(amount int64, payment []byte) error {
 	if s.State.Status != StatusOpen {
 		return ErrNotStatusOpen
 	}
 
 	s.State.Count++
 	s.State.Balance += amount
+	s.State.Payments = append(s.State.Payments, payment)
 	return nil
 }
 

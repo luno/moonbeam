@@ -11,6 +11,8 @@ import (
 const addr1 = "mrreYyaosje7fxCLi3pzknasHiSfziX9GY"
 const addr2 = "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5"
 
+var testPayment = []byte{1, 2, 3}
+
 func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 	net := &chaincfg.TestNet3Params
 
@@ -184,10 +186,10 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount, sig); err != nil {
+	if err := r.Send(amount, testPayment, sig); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SendAccepted(amount); err != nil {
+	if err := s.SendAccepted(amount, testPayment); err != nil {
 		t.Fatal(err)
 	}
 
@@ -195,10 +197,10 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount*2, sig); err != nil {
+	if err := r.Send(amount*2, testPayment, sig); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SendAccepted(amount * 2); err != nil {
+	if err := s.SendAccepted(amount*2, testPayment); err != nil {
 		t.Fatal(err)
 	}
 
@@ -264,7 +266,7 @@ func TestInvalidSendSig(t *testing.T) {
 
 	const amount = 1000
 
-	if err := r.Send(amount, nil); err == nil {
+	if err := r.Send(amount, testPayment, nil); err == nil {
 		t.Errorf("Expected error due invalid signature")
 	}
 
@@ -272,7 +274,7 @@ func TestInvalidSendSig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount, sig); err == nil {
+	if err := r.Send(amount, testPayment, sig); err == nil {
 		t.Errorf("Expected error due invalid signature")
 	}
 }
@@ -326,7 +328,7 @@ func TestSendDust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount, sig); err == nil {
+	if err := r.Send(amount, testPayment, sig); err == nil {
 		t.Errorf("Expected error due to dust output")
 	}
 }

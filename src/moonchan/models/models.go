@@ -41,7 +41,7 @@ type Payment struct {
 type ValidateRequest struct {
 	ID string `json:"id"`
 
-	Payment Payment `json:"payment"`
+	Payment []byte `json:"payment"`
 }
 
 type ValidateResponse struct {
@@ -51,7 +51,7 @@ type ValidateResponse struct {
 type SendRequest struct {
 	ID string `json:"id"`
 
-	Payment Payment `json:"payment"`
+	Payment []byte `json:"payment"`
 
 	SenderSig []byte `json:"senderSig"`
 }
