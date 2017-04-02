@@ -22,6 +22,8 @@ type Channel struct {
 	PendingPayment []byte
 
 	State channels.SharedState
+
+	Payments [][]byte
 }
 
 type State struct {
@@ -150,7 +152,12 @@ func storePendingPayment(id string, state channels.SharedState, p []byte) error 
 		return errors.New("channel does not exist")
 	}
 	c.State = state
-	c.PendingPayment = p
+	if p == nil {
+		c.Payments = append(c.Payments, c.PendingPayment)
+		c.PendingPayment = nil
+	} else {
+		c.PendingPayment = p
+	}
 	globalState.Channels[id] = c
 	return nil
 }
