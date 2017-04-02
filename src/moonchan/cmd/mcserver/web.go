@@ -163,13 +163,7 @@ func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	simple, err := s.ToSimple()
-	if err != nil {
-		http.Error(w, "error", http.StatusInternalServerError)
-		return
-	}
-
-	buf, err := json.MarshalIndent(simple, "", "   ")
+	buf, err := json.MarshalIndent(s, "", "   ")
 	if err != nil {
 		http.Error(w, "error", http.StatusInternalServerError)
 		return

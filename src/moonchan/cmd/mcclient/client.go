@@ -121,7 +121,7 @@ func create(args []string) error {
 		return err
 	}
 	var req models.CreateRequest
-	req.SenderPubKey = s.State.SenderPubKey.PubKey().SerializeCompressed()
+	req.SenderPubKey = s.State.SenderPubKey
 	req.SenderOutput = s.State.SenderOutput
 	resp, err := c.Create(req)
 	if err != nil {
@@ -136,8 +136,9 @@ func create(args []string) error {
 	if err != nil {
 		return err
 	}
+	receiverPubKeyBytes := receiverPubKey.PubKey().SerializeCompressed()
 
-	err = s.ReceivedPubKey(receiverPubKey, resp.ReceiverOutput, resp.Timeout, resp.Fee)
+	err = s.ReceivedPubKey(receiverPubKeyBytes, resp.ReceiverOutput, resp.Timeout, resp.Fee)
 	if err != nil {
 		return err
 	}
@@ -158,16 +159,11 @@ func create(args []string) error {
 		return errors.New("reused channel id")
 	}
 
-	ss, err := s.State.ToSimple()
-	if err != nil {
-		return err
-	}
-
 	id := strconv.Itoa(n)
 	globalState.Channels[id] = Channel{
 		Domain:   domain,
 		Host:     host,
-		State:    *ss,
+		State:    s.State,
 		KeyPath:  n,
 		RemoteID: resp.ID,
 	}

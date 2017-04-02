@@ -40,12 +40,25 @@ func fundingTxScript(senderPubKey, receiverPubKey *btcutil.AddressPubKey, timeou
 }
 
 func (s *SharedState) GetFundingScript() ([]byte, string, error) {
-	script, err := fundingTxScript(s.SenderPubKey, s.ReceiverPubKey, s.Timeout)
+	senderPubKey, err := s.SenderAddressPubKey()
+	if err != nil {
+		return nil, "", err
+	}
+	receiverPubKey, err := s.ReceiverAddressPubKey()
+	if err != nil {
+		return nil, "", err
+	}
+	net, err := s.GetNet()
 	if err != nil {
 		return nil, "", err
 	}
 
-	scriptHash, err := btcutil.NewAddressScriptHash(script, s.Net)
+	script, err := fundingTxScript(senderPubKey, receiverPubKey, s.Timeout)
+	if err != nil {
+		return nil, "", err
+	}
+
+	scriptHash, err := btcutil.NewAddressScriptHash(script, net)
 	if err != nil {
 		return nil, "", err
 	}
@@ -88,6 +101,11 @@ func sendToAddress(net *chaincfg.Params, amount int64, addr string) (*wire.TxOut
 }
 
 func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
+	net, err := s.GetNet()
+	if err != nil {
+		return nil, err
+	}
+
 	receiveAmount := balance
 	senderAmount := s.Capacity - balance - s.Fee
 
@@ -97,7 +115,7 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	}
 
 	if receiveAmount >= dustThreshold {
-		txout, err := sendToAddress(s.Net, receiveAmount, s.ReceiverOutput)
+		txout, err := sendToAddress(net, receiveAmount, s.ReceiverOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +123,7 @@ func (s *SharedState) GetClosureTx(balance int64) (*wire.MsgTx, error) {
 	}
 
 	if senderAmount >= dustThreshold {
-		txout, err := sendToAddress(s.Net, senderAmount, s.SenderOutput)
+		txout, err := sendToAddress(net, senderAmount, s.SenderOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -154,13 +172,18 @@ func (s *SharedState) GetClosureTxSigned(balance int64, senderSig []byte, privKe
 }
 
 func (s *SharedState) GetRefundTxSigned(privKey *btcec.PrivateKey) ([]byte, error) {
+	net, err := s.GetNet()
+	if err != nil {
+		return nil, err
+	}
+
 	tx, err := s.spendFundingTx()
 	if err != nil {
 		return nil, err
 	}
 
 	amount := s.Capacity - s.Fee
-	txout, err := sendToAddress(s.Net, amount, s.SenderOutput)
+	txout, err := sendToAddress(net, amount, s.SenderOutput)
 	if err != nil {
 		return nil, err
 	}
@@ -179,9 +202,14 @@ func (s *SharedState) GetRefundTxSigned(privKey *btcec.PrivateKey) ([]byte, erro
 		return nil, err
 	}
 
+	senderPubKey, err := s.SenderAddressPubKey()
+	if err != nil {
+		return nil, err
+	}
+
 	b := txscript.NewScriptBuilder()
 	b.AddData(sig)
-	b.AddData(s.SenderPubKey.ScriptAddress())
+	b.AddData(senderPubKey.ScriptAddress())
 	b.AddOp(txscript.OP_FALSE)
 	b.AddData(script)
 	finalScript, err := b.Script()
@@ -200,11 +228,24 @@ func (s *SharedState) GetRefundTxSigned(privKey *btcec.PrivateKey) ([]byte, erro
 }
 
 func (s *SharedState) validateTx(rawTx []byte) error {
-	script, err := fundingTxScript(s.SenderPubKey, s.ReceiverPubKey, s.Timeout)
+	senderPubKey, err := s.SenderAddressPubKey()
 	if err != nil {
 		return err
 	}
-	addr, err := btcutil.NewAddressScriptHash(script, s.Net)
+	receiverPubKey, err := s.ReceiverAddressPubKey()
+	if err != nil {
+		return err
+	}
+	net, err := s.GetNet()
+	if err != nil {
+		return err
+	}
+
+	script, err := fundingTxScript(senderPubKey, receiverPubKey, s.Timeout)
+	if err != nil {
+		return err
+	}
+	addr, err := btcutil.NewAddressScriptHash(script, net)
 	if err != nil {
 		return err
 	}

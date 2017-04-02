@@ -42,30 +42,6 @@ const (
 	MinFundingConf = 1
 )
 
-type SharedState struct {
-	Version int
-	Net     *chaincfg.Params
-	Timeout int64
-	Fee     int64
-
-	Status Status
-
-	SenderPubKey   *btcutil.AddressPubKey
-	ReceiverPubKey *btcutil.AddressPubKey
-
-	SenderOutput   string
-	ReceiverOutput string
-
-	FundingTxID string
-	FundingVout uint32
-	Capacity    int64
-	BlockHeight int
-
-	Balance   int64
-	Count     int
-	SenderSig []byte
-}
-
 var ErrAmountTooSmall = errors.New("amount is too small")
 var ErrInsufficientCapacity = errors.New("amount exceeds channel capacity")
 
@@ -93,7 +69,7 @@ func (ss *SharedState) validateAmount(amount int64) (int64, error) {
 func DefaultState(net *chaincfg.Params) SharedState {
 	return SharedState{
 		Version: 1,
-		Net:     net,
+		Net:     netName(net),
 		Timeout: DefaultTimeout,
 		Fee:     75000,
 		Status:  StatusCreated,
@@ -147,7 +123,7 @@ func OpenChannel(net *chaincfg.Params, privKey *btcec.PrivateKey, outputAddr str
 	}
 
 	ss := DefaultState(net)
-	ss.SenderPubKey = pubKey
+	ss.SenderPubKey = pubKey.PubKey().SerializeCompressed()
 	ss.SenderOutput = outputAddr
 
 	c := Sender{
@@ -164,8 +140,12 @@ const (
 	maxFee     = 100000
 )
 
-func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey, receiverOutput string, timeout, fee int64) error {
-	if err := checkSupportedAddress(s.State.Net, receiverOutput); err != nil {
+func (s *Sender) ReceivedPubKey(receiverPubKey []byte, receiverOutput string, timeout, fee int64) error {
+	net, err := s.State.GetNet()
+	if err != nil {
+		return err
+	}
+	if err := checkSupportedAddress(net, receiverOutput); err != nil {
 		return err
 	}
 
@@ -182,9 +162,13 @@ func (s *Sender) ReceivedPubKey(pubKey *btcutil.AddressPubKey, receiverOutput st
 		return errors.New("fee is too large")
 	}
 
+	if _, err := btcutil.NewAddressPubKey(receiverPubKey, net); err != nil {
+		return err
+	}
+
 	s.State.Timeout = timeout
 	s.State.Fee = fee
-	s.State.ReceiverPubKey = pubKey
+	s.State.ReceiverPubKey = receiverPubKey
 	s.State.ReceiverOutput = receiverOutput
 
 	return nil
@@ -200,16 +184,20 @@ func NewReceiver(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error
 }
 
 func AcceptChannel(state SharedState, privKey *btcec.PrivateKey) (*Receiver, error) {
-	if err := checkSupportedAddress(state.Net, state.SenderOutput); err != nil {
+	net, err := state.GetNet()
+	if err != nil {
+		return nil, err
+	}
+	if err := checkSupportedAddress(net, state.SenderOutput); err != nil {
 		return nil, err
 	}
 
-	pubKey, err := derivePubKey(privKey, state.Net)
+	pubKey, err := derivePubKey(privKey, net)
 	if err != nil {
 		return nil, err
 	}
 
-	state.ReceiverPubKey = pubKey
+	state.ReceiverPubKey = pubKey.PubKey().SerializeCompressed()
 	state.Status = StatusCreated
 
 	c := Receiver{

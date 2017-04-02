@@ -55,13 +55,7 @@ func (r *Receiver) Get(id string) *channels.SharedState {
 	if rec == nil {
 		return nil
 	}
-
-	ss, err := channels.FromSimple(rec.SharedState)
-	if err != nil {
-		// FIXME: report error
-		return nil
-	}
-	return ss
+	return &rec.SharedState
 }
 
 func (r *Receiver) List() ([]storage.Record, error) {
@@ -90,13 +84,12 @@ func genChannelID() (string, error) {
 }
 
 func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, error) {
-	senderPubKey, err := btcutil.NewAddressPubKey(req.SenderPubKey, r.Net)
-	if err != nil {
+	if _, err := btcutil.NewAddressPubKey(req.SenderPubKey, r.Net); err != nil {
 		return nil, err
 	}
 
 	ss := channels.DefaultState(r.Net)
-	ss.SenderPubKey = senderPubKey
+	ss.SenderPubKey = req.SenderPubKey
 	ss.SenderOutput = req.SenderOutput
 	ss.ReceiverOutput = r.receiverOutput
 
@@ -119,15 +112,10 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	sss, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
-
 	rec := storage.Record{
 		ID:          id,
 		KeyPath:     n,
-		SharedState: *sss,
+		SharedState: c.State,
 	}
 
 	if err := r.db.Create(rec); err != nil {
@@ -143,8 +131,8 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		ID:             rec.ID,
 		Timeout:        c.State.Timeout,
 		Fee:            c.State.Fee,
-		ReceiverPubKey: sss.ReceiverPubKey,
-		ReceiverOutput: sss.ReceiverOutput,
+		ReceiverPubKey: c.State.ReceiverPubKey,
+		ReceiverOutput: c.State.ReceiverOutput,
 		FundingAddress: addr,
 	}
 	return &resp, nil
@@ -206,12 +194,7 @@ func (r *Receiver) get(id string) (*channels.Receiver, error) {
 		return nil, err
 	}
 
-	ss, err := channels.FromSimple(rec.SharedState)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := channels.NewReceiver(*ss, privKey)
+	c, err := channels.NewReceiver(rec.SharedState, privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -224,10 +207,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	prev, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
+	prevState := c.State
 
 	_, addr, err := c.State.GetFundingScript()
 	if err != nil {
@@ -257,12 +237,9 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	newState, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
+	newState := c.State
 
-	if err := r.db.Update(req.ID, *prev, *newState); err != nil {
+	if err := r.db.Update(req.ID, prevState, newState); err != nil {
 		return nil, err
 	}
 
@@ -295,10 +272,7 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	prev, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
+	prevState := c.State
 
 	valid, err := r.validate(c, req.Payment)
 	if err != nil {
@@ -317,12 +291,9 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		Amount: req.Payment.Amount,
 	}
 
-	newState, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
+	newState := c.State
 
-	if err := r.db.Send(req.ID, *prev, *newState, p); err != nil {
+	if err := r.db.Send(req.ID, prevState, newState, p); err != nil {
 		return nil, err
 	}
 
@@ -334,10 +305,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 	if err != nil {
 		return nil, err
 	}
-	prev, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
+	prevState := c.State
 
 	rawTx, err := c.Close()
 	if err != nil {
@@ -346,12 +314,9 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	log.Printf("closeTx: %s", hex.EncodeToString(rawTx))
 
-	newState, err := c.State.ToSimple()
-	if err != nil {
-		return nil, err
-	}
+	newState := c.State
 
-	if err := r.db.Update(req.ID, *prev, *newState); err != nil {
+	if err := r.db.Update(req.ID, prevState, newState); err != nil {
 		return nil, err
 	}
 

@@ -12,7 +12,7 @@ var ErrConcurrentUpdate = errors.New("concurrent update")
 type Record struct {
 	ID          string
 	KeyPath     int
-	SharedState channels.SimpleSharedState
+	SharedState channels.SharedState
 }
 
 type Payment struct {
@@ -24,8 +24,8 @@ type Storage interface {
 	Get(id string) (*Record, error)
 	List() ([]Record, error)
 	Create(rec Record) error
-	Update(id string, prev, new channels.SimpleSharedState) error
-	Send(id string, prev, new channels.SimpleSharedState, p Payment) error
+	Update(id string, prev, new channels.SharedState) error
+	Send(id string, prev, new channels.SharedState, p Payment) error
 	ReserveKeyPath() (int, error)
 	ListPayments() ([]Payment, error)
 }

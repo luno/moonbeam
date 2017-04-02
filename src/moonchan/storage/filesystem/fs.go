@@ -133,12 +133,12 @@ func (fs *FilesystemStorage) Create(rec storage.Record) error {
 	return fs.save(d)
 }
 
-func checkSame(d *data, id string, prev channels.SimpleSharedState) bool {
+func checkSame(d *data, id string, prev channels.SharedState) bool {
 	s := d.Channels[id].SharedState
 	return s.Status == prev.Status && s.Count == prev.Count
 }
 
-func (fs *FilesystemStorage) Update(id string, prev, new channels.SimpleSharedState) error {
+func (fs *FilesystemStorage) Update(id string, prev, new channels.SharedState) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
@@ -162,7 +162,7 @@ func (fs *FilesystemStorage) Update(id string, prev, new channels.SimpleSharedSt
 	return fs.save(d)
 }
 
-func (fs *FilesystemStorage) Send(id string, prev, new channels.SimpleSharedState, p storage.Payment) error {
+func (fs *FilesystemStorage) Send(id string, prev, new channels.SharedState, p storage.Payment) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 

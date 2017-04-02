@@ -22,7 +22,7 @@ type Channel struct {
 
 	PendingPayment *models.Payment
 
-	State channels.SimpleSharedState
+	State channels.SharedState
 }
 
 type State struct {
@@ -121,17 +121,13 @@ func getChannel(id string) (*Channel, *channels.Sender, error) {
 	if !ok {
 		return nil, nil, errors.New("unknown id")
 	}
-	ss, err := channels.FromSimple(s.State)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	privkey, _, err := loadkey(globalState, s.KeyPath)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sender, err := channels.NewSender(*ss, privkey)
+	sender, err := channels.NewSender(s.State, privkey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -140,29 +136,21 @@ func getChannel(id string) (*Channel, *channels.Sender, error) {
 }
 
 func storeChannel(id string, state channels.SharedState) error {
-	newState, err := state.ToSimple()
-	if err != nil {
-		return err
-	}
 	c, ok := globalState.Channels[id]
 	if !ok {
 		return errors.New("channel does not exist")
 	}
-	c.State = *newState
+	c.State = state
 	globalState.Channels[id] = c
 	return nil
 }
 
 func storePendingPayment(id string, state channels.SharedState, p *models.Payment) error {
-	newState, err := state.ToSimple()
-	if err != nil {
-		return err
-	}
 	c, ok := globalState.Channels[id]
 	if !ok {
 		return errors.New("channel does not exist")
 	}
-	c.State = *newState
+	c.State = state
 	c.PendingPayment = p
 	globalState.Channels[id] = c
 	return nil
