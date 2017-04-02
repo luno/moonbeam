@@ -33,13 +33,27 @@ type OpenRequest struct {
 type OpenResponse struct {
 }
 
+type Payment struct {
+	Amount int64  `json:"amount"`
+	Target string `json:"target"`
+}
+
+type ValidateRequest struct {
+	ID string `json:"id"`
+
+	Payment Payment `json:"payment"`
+}
+
+type ValidateResponse struct {
+	Valid bool `json:"valid"`
+}
+
 type SendRequest struct {
 	ID string `json:"id"`
 
-	Amount    int64  `json:"amount"`
-	SenderSig []byte `json:"senderSig"`
+	Payment Payment `json:"payment"`
 
-	Target string `json:"target"`
+	SenderSig []byte `json:"senderSig"`
 }
 
 type SendResponse struct {

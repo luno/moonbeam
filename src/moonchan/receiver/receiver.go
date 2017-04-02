@@ -264,6 +264,19 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	return &models.OpenResponse{}, nil
 }
 
+func (r *Receiver) Validate(req models.ValidateRequest) (*models.ValidateResponse, error) {
+	c, err := r.get(req.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	valid := c.Validate(req.Payment.Amount)
+
+	return &models.ValidateResponse{
+		Valid: valid,
+	}, nil
+}
+
 func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 	c, err := r.get(req.ID)
 	if err != nil {
@@ -274,13 +287,13 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		return nil, err
 	}
 
-	if err := c.Send(req.Amount, req.SenderSig); err != nil {
+	if err := c.Send(req.Payment.Amount, req.SenderSig); err != nil {
 		return nil, err
 	}
 
 	p := storage.Payment{
-		Target: req.Target,
-		Amount: req.Amount,
+		Target: req.Payment.Target,
+		Amount: req.Payment.Amount,
 	}
 
 	newState, err := c.State.ToSimple()

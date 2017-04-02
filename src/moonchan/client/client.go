@@ -94,6 +94,14 @@ func (c *Client) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	return &resp, nil
 }
 
+func (c *Client) Validate(req models.ValidateRequest) (*models.ValidateResponse, error) {
+	var resp models.ValidateResponse
+	if err := c.do(http.MethodPut, req.ID, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 func (c *Client) Send(req models.SendRequest) (*models.SendResponse, error) {
 	var resp models.SendResponse
 	if err := c.do(http.MethodPost, req.ID, req, &resp); err != nil {

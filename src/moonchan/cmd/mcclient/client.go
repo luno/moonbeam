@@ -245,7 +245,7 @@ func send(args []string) error {
 		return err
 	}
 
-	p := Payment{
+	p := models.Payment{
 		Amount: amount,
 		Target: target,
 	}
@@ -257,6 +257,23 @@ func send(args []string) error {
 	if ch.PendingPayment != nil {
 		return errors.New("there is already a pending payment")
 	}
+
+	c, err := getClient(id)
+	if err != nil {
+		return err
+	}
+	req := models.ValidateRequest{
+		ID:      ch.RemoteID,
+		Payment: p,
+	}
+	resp, err := c.Validate(req)
+	if err != nil {
+		return err
+	}
+	if !resp.Valid {
+		return errors.New("payment rejected by server")
+	}
+
 	if err := storePendingPayment(id, sender.State, &p); err != nil {
 		return err
 	}
@@ -273,11 +290,11 @@ func flush(id string) error {
 		return err
 	}
 
-	if ch.PendingPayment == nil {
+	p := ch.PendingPayment
+	if p == nil {
 		fmt.Println("No pending payment to flush.")
 		return nil
 	}
-	p := ch.PendingPayment
 
 	sig, err := sender.PrepareSend(p.Amount)
 	if err != nil {
@@ -305,9 +322,8 @@ func flush(id string) error {
 
 		req := models.SendRequest{
 			ID:        ch.RemoteID,
-			Amount:    p.Amount,
+			Payment:   *p,
 			SenderSig: sig,
-			Target:    p.Target,
 		}
 		if _, err := c.Send(req); err != nil {
 			return err

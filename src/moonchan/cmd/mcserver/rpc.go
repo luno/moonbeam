@@ -74,6 +74,18 @@ func rpcOpenHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id s
 	respond(w, r, resp, err)
 }
 
+func rpcValidateHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+	var req models.ValidateRequest
+	if !parse(w, r, &req) {
+		return
+	}
+	if !checkID(w, req.ID, id) {
+		return
+	}
+	resp, err := s.Receiver.Validate(req)
+	respond(w, r, resp, err)
+}
+
 func rpcSendHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
 	var req models.SendRequest
 	if !parse(w, r, &req) {
@@ -138,6 +150,8 @@ func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPatch:
 		rpcOpenHandler(s, w, r, id)
+	case http.MethodPut:
+		rpcValidateHandler(s, w, r, id)
 	case http.MethodPost:
 		rpcSendHandler(s, w, r, id)
 	case http.MethodDelete:

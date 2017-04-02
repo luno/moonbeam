@@ -11,12 +11,8 @@ import (
 	"github.com/btcsuite/btcutil/hdkeychain"
 
 	"moonchan/channels"
+	"moonchan/models"
 )
-
-type Payment struct {
-	Amount int64
-	Target string
-}
 
 type Channel struct {
 	Domain   string
@@ -24,7 +20,7 @@ type Channel struct {
 	KeyPath  int
 	RemoteID string
 
-	PendingPayment *Payment
+	PendingPayment *models.Payment
 
 	State channels.SimpleSharedState
 }
@@ -157,7 +153,7 @@ func storeChannel(id string, state channels.SharedState) error {
 	return nil
 }
 
-func storePendingPayment(id string, state channels.SharedState, p *Payment) error {
+func storePendingPayment(id string, state channels.SharedState, p *models.Payment) error {
 	newState, err := state.ToSimple()
 	if err != nil {
 		return err

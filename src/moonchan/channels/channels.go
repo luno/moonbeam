@@ -305,6 +305,18 @@ func (r *Receiver) validateSenderSig(balance int64, senderSig []byte) error {
 	return nil
 }
 
+func (r *Receiver) Validate(amount int64) bool {
+	if r.State.Status != StatusOpen {
+		return false
+	}
+
+	if _, err := r.State.validateAmount(amount); err != nil {
+		return false
+	}
+
+	return true
+}
+
 func (r *Receiver) Send(amount int64, senderSig []byte) error {
 	if r.State.Status != StatusOpen {
 		return ErrNotStatusOpen
