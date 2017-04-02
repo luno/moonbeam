@@ -72,8 +72,9 @@ type StatusRequest struct {
 }
 
 type StatusResponse struct {
-	Status  int   `json:"status"`
-	Balance int64 `json:"balance"`
+	Status       int    `json:"status"`
+	Balance      int64  `json:"balance"`
+	PaymentsHash []byte `json:"paymentsHash"`
 }
 
 func ValidateChannelID(s string) bool {

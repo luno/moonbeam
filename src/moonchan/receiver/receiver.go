@@ -356,7 +356,8 @@ func (r *Receiver) Status(req models.StatusRequest) (*models.StatusResponse, err
 	}
 
 	return &models.StatusResponse{
-		Status:  int(c.State.Status),
-		Balance: c.State.Balance,
+		Status:       int(c.State.Status),
+		Balance:      c.State.Balance,
+		PaymentsHash: c.State.PaymentsHash[:],
 	}, nil
 }

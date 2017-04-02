@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -416,8 +417,14 @@ func status(args []string) error {
 
 	serverStatus := channels.Status(resp.Status)
 
-	if sender.State.Balance != resp.Balance || sender.State.Status != serverStatus {
-		fmt.Printf("Warning: Local state differs from server state.\n")
+	if sender.State.Status != serverStatus {
+		fmt.Printf("Warning: Status differs\n")
+	}
+	if sender.State.Balance != resp.Balance {
+		fmt.Printf("Warning: Balance differs\n")
+	}
+	if !bytes.Equal(sender.State.PaymentsHash[:], resp.PaymentsHash) {
+		fmt.Printf("Warning: PaymentsHash differs\n")
 	}
 
 	if isClosing(serverStatus) && !isClosing(sender.State.Status) {

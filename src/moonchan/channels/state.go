@@ -2,9 +2,7 @@ package channels
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
-	"io"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
@@ -29,11 +27,10 @@ type SharedState struct {
 	Capacity    int64
 	BlockHeight int
 
-	Balance   int64
-	Count     int
-	SenderSig []byte
-
-	Payments [][]byte
+	Balance      int64
+	Count        int
+	PaymentsHash [32]byte
+	SenderSig    []byte
 }
 
 func (ss *SharedState) GetNet() (*chaincfg.Params, error) {
@@ -85,20 +82,7 @@ const (
 func validatePaymentSize(size int) bool {
 	return size > minPaymentSize && size < maxPaymentSize
 }
-func writePayment(w io.Writer, p []byte) error {
-	if err := binary.Write(w, binary.LittleEndian, len(p)); err != nil {
-		return err
-	}
-	_, err := w.Write(p)
-	return err
-}
 
-func hashPayments(pl [][]byte) ([]byte, error) {
-	h := sha256.New()
-	for _, p := range pl {
-		if err := writePayment(h, p); err != nil {
-			return nil, err
-		}
-	}
-	return h.Sum(nil), nil
+func chainHash(prevHash [32]byte, payment []byte) [32]byte {
+	return sha256.Sum256(append(payment, prevHash[:]...))
 }

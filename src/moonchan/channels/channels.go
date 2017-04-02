@@ -323,14 +323,16 @@ func (r *Receiver) Send(amount int64, payment, senderSig []byte) error {
 		return err
 	}
 
+	newHash := chainHash(r.State.PaymentsHash, payment)
+
 	if err := r.validateSenderSig(newBalance, senderSig); err != nil {
 		return err
 	}
 
 	r.State.Count++
 	r.State.Balance = newBalance
+	r.State.PaymentsHash = newHash
 	r.State.SenderSig = senderSig
-	r.State.Payments = append(r.State.Payments, payment)
 
 	return nil
 }
@@ -340,9 +342,11 @@ func (s *Sender) SendAccepted(amount int64, payment []byte) error {
 		return ErrNotStatusOpen
 	}
 
+	newHash := chainHash(s.State.PaymentsHash, payment)
+
 	s.State.Count++
 	s.State.Balance += amount
-	s.State.Payments = append(s.State.Payments, payment)
+	s.State.PaymentsHash = newHash
 	return nil
 }
 
