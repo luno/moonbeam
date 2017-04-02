@@ -336,6 +336,15 @@ func (s *Sender) SendAccepted(amount int64) error {
 	return nil
 }
 
+func (s *Sender) Close() error {
+	if s.State.Status != StatusOpen && s.State.Status != StatusClosing {
+		return ErrNotStatusOpen
+	}
+
+	s.State.Status = StatusClosing
+	return nil
+}
+
 func (r *Receiver) Close() ([]byte, error) {
 	if r.State.Status != StatusOpen && r.State.Status != StatusClosing {
 		return nil, ErrNotStatusOpen

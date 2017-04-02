@@ -366,10 +366,14 @@ func closeAction(args []string) error {
 	return storeChannel(id, sender.State)
 }
 
+func isClosing(s channels.Status) bool {
+	return s == channels.StatusClosing || s == channels.StatusClosed
+}
+
 func status(args []string) error {
 	id := args[0]
 
-	ch, _, err := getChannel(id)
+	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -388,6 +392,19 @@ func status(args []string) error {
 
 	buf, _ := json.MarshalIndent(resp, "", "    ")
 	fmt.Printf("%s\n", string(buf))
+
+	serverStatus := channels.Status(resp.Status)
+
+	if sender.State.Balance != resp.Balance || sender.State.Status != serverStatus {
+		fmt.Printf("Warning: Local state differs from server state.\n")
+	}
+
+	if isClosing(serverStatus) && !isClosing(sender.State.Status) {
+		if err := sender.Close(); err != nil {
+			return err
+		}
+		return storeChannel(id, sender.State)
+	}
 
 	return nil
 }
