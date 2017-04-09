@@ -37,6 +37,8 @@ selectively per-payment).
 
 Go Packages
 
+Demo server: https://bitcoinmoonbeam.org
+
 ## Reference implementation
 
 This repository contains a reference client and server implementation written in
