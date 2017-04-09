@@ -31,13 +31,13 @@ selectively per-payment).
 
 ## Documentation
 
-[Specification](docs/spec.md)
-
 [Quickstart](docs/quickstart.md)
 
-Go Packages
+[Specification](docs/spec.md)
 
-Demo server: https://bitcoinmoonbeam.org
+Go Package Documentation
+
+Demo server (testnet): https://bitcoinmoonbeam.org
 
 ## Reference implementation
 
