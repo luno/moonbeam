@@ -10,7 +10,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
-	"moonchan/channels"
+	"bitbucket.org/bitx/moonchan/channels"
 )
 
 type Channel struct {

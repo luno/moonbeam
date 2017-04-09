@@ -6,8 +6,8 @@ import (
 	"os"
 	"sync"
 
-	"moonchan/channels"
-	"moonchan/storage"
+	"bitbucket.org/bitx/moonchan/channels"
+	"bitbucket.org/bitx/moonchan/storage"
 )
 
 type data struct {

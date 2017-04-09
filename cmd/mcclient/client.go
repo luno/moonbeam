@@ -17,11 +17,11 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
-	"moonchan/address"
-	"moonchan/channels"
-	"moonchan/client"
-	"moonchan/models"
-	"moonchan/resolver"
+	"bitbucket.org/bitx/moonchan/address"
+	"bitbucket.org/bitx/moonchan/channels"
+	"bitbucket.org/bitx/moonchan/client"
+	"bitbucket.org/bitx/moonchan/models"
+	"bitbucket.org/bitx/moonchan/resolver"
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"moonchan/models"
+	"bitbucket.org/bitx/moonchan/models"
 )
 
 var debugServerRPC = flag.Bool(

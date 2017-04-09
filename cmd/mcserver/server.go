@@ -10,9 +10,9 @@ import (
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
-	"moonchan/receiver"
-	"moonchan/resolver"
-	"moonchan/storage/filesystem"
+	"bitbucket.org/bitx/moonchan/receiver"
+	"bitbucket.org/bitx/moonchan/resolver"
+	"bitbucket.org/bitx/moonchan/storage/filesystem"
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")

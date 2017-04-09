@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"sort"
 
-	"moonchan/models"
-	"moonchan/resolver"
-	"moonchan/storage"
+	"bitbucket.org/bitx/moonchan/models"
+	"bitbucket.org/bitx/moonchan/resolver"
+	"bitbucket.org/bitx/moonchan/storage"
 )
 
 func render(t *template.Template, w http.ResponseWriter, data interface{}) {

@@ -3,7 +3,7 @@ package storage
 import (
 	"errors"
 
-	"moonchan/channels"
+	"bitbucket.org/bitx/moonchan/channels"
 )
 
 var ErrNotFound = errors.New("record not found")

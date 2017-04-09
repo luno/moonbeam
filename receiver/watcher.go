@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"moonchan/channels"
-	"moonchan/models"
-	"moonchan/storage"
+	"bitbucket.org/bitx/moonchan/channels"
+	"bitbucket.org/bitx/moonchan/models"
+	"bitbucket.org/bitx/moonchan/storage"
 )
 
 func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {

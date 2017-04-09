@@ -17,9 +17,9 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
-	"moonchan/channels"
-	"moonchan/models"
-	"moonchan/storage"
+	"bitbucket.org/bitx/moonchan/channels"
+	"bitbucket.org/bitx/moonchan/models"
+	"bitbucket.org/bitx/moonchan/storage"
 )
 
 type Receiver struct {
