@@ -2,13 +2,15 @@
 
 ## Abstract
 
-The Moonbeam system allows for off-chain payments between two untrusted parties using Bitcoin payment channels. The system is suited for use between “hosted” wallet services that serve many users. It can be deployed on the Bitcoin network as is today.
+The Moonbeam system allows for off-chain payments between two untrusted parties using Bitcoin payment channels. The system is suited for use between multi-user platforms such as hosted wallets, exchanges and payment processors. It can be deployed on the Bitcoin network as is today.
 
 ## Introduction
 
-
-
-
+Moonbeam builds on the concept of payment channels in Bitcoin.
+It describes a system whereby clients can initiate payment channels to send
+payments to servers. The server in this context would usually be a multi-user
+platform so that the channel can be used to send payments to any of the users
+on the platform.
 
 ## Definitions
 
@@ -29,7 +31,7 @@ Moonbeam addresses have the following format:
 **address** is a standard Bitcoin address (e.g. “mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2”).  
 **domain** is a full qualified domain name (e.g. “example.com”).  
 **version** consists of 1 character  
-**checksum** consists of 5 character
+**checksum** consists of 5 characters
 
 The version and checksum characters are computed using the base58 encoding scheme used for standard Bitcoin addresses. First the string is rearranged to `<address>+mb@<domain>` and interpreted as a byte array. Next this byte array is encoded according to the base58 algorithm with version=0x01. The first character becomes version and the last 4 characters becomes checksum.
 
@@ -38,9 +40,9 @@ Future versions of Moonbeam may use larger version numbers.
 Example:
 `mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb7vCiK@example.com`
 
-## Name Resolution
+## Domain Resolution
 
-In order to send a payment to “mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb7vCiK@example.com”, the sender must open a channel to example.com. The name resolution procedure describes how to resolve “example.com” to a suitable endpoint for the RPC protocol.
+In order to send a payment to “mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb7vCiK@example.com”, the sender must open a channel to example.com. The domain resolution procedure describes how to resolve “example.com” to a suitable endpoint for the RPC protocol.
 
 If domain accepts Moonbeam payments, then the URL `https://<domain>/moonbeam.json` will contain a JSON document pointing to the Moonbeam RPC endpoints for the domain.
 
@@ -361,11 +363,51 @@ type StatusResponse struct {
 ```
 
 
-## Flow
+## Flows
 
 
+### Initiating a channel
 
-## Sending a payment
+When a sender decides to open a new channel to a given domain, it first follows
+the domain resolution procedure described above to get the server's RPC endpoint
+URL.
+
+The client then generates a new *senderPubKey* (probably using an HD key chain)
+and sends a CreateRequest message to the server.
+
+The server returns a CreateResponse message with the channel parameters.
+If these parameters are acceptable, the client can continue with the flow.
+If not, it can abandon the process.
+
+The client should recompute the funding address from the local state and
+ensure that it matches CreateResponse.FundingAddress.
+
+The channel now has status CREATED.
+
+### Funding the channel
+
+The client now sends a payment to *fundingAddress*. The amount sent becomes the
+*capacity* of the channel. The client can choose the amount as needed for its
+expected payment activities.
+
+Once the funding transaction has confirmed, the client should send an
+OpenRequest with the txid to open the channel. The server will validate that
+the (txid, vout) output is unspent. The channel is now open.
+
+The channel now has status OPEN.
+
+### Sending a payment (simplified)
+
+The client can now send payments through the channel to targets on the server.
+This is done by populating a Payment struct, sending a ValidateRequest to
+check that the server will accept the payment, and then sending a SendRequest
+to actually send the payment.
+
+The SendRequest contains the client's signature for the updated channel closure
+transaction. The server will validate that the signature is valid before
+accepting the payment.
+
+### Sending a payment (full)
 
 Sending a payment is straightforward in principle but it becomes more complicated when you consider failure scenarios: The Send RPC could fail and we can’t be sure whether the server has processed the new payment or not. It is further complicated by the fact that we can’t trust the error returned by the Send RPC since the server could return a “fake” error.
 
@@ -389,7 +431,7 @@ Since the _senderSig_ encodes the current channel state, it is always safe to re
 
 If we fail to send a payment and close the channel, after the closure transaction has been mined, we can check whether the payment was in fact accepted or not.
 
-### Example scenario of an attack where the sender might return misleading errors
+#### Example scenario of an attack where the sender might return misleading errors
 
 Assume the receiver has an account with the sender.
 
@@ -408,12 +450,106 @@ The attacker empties out account (b) at the sender through other means and publi
 Prevention:
 Close the channel after any failed transaction (after retrying).
 
+### Closure
 
-## Security
+Once the client has finished sending payments, it can send a CloseRequest
+message to request the server to close the channel. The server will then
+broadcast the latest closure transaction and return the raw transaction.
+The client should broadcast the closure transaction too.
 
-Receiver must not accept any further payments after sharing the closure transaction with the sender. Otherwise the sender could publish the transaction.
-Risks
+The receiver must not accept any further payments after sharing the closure
+transaction with the sender. Otherwise the sender could publish the transaction.
 
+The channel status is now CLOSING. Once the closure transaction is confirmed,
+the channel status becomes CLOSED.
+
+### Blockchain monitoring
+
+Throughout this flow, the server must monitor the blockchain. If the block
+height gets too close to channel timeout, the server must close the channel
+by broadcasting the closure transaction. Failure to do this early enought risks
+that the client broadcast the refund transaction.
+
+
+## Security considerations
+
+The server must never share the signed closure transaction with the receiver
+until the channel is closed. Otherwise, the sender could keep a copy of a
+previous closure transaction and broadcast it.
+
+The server could also broadcast a previous version of the closure transaction.
+This would revoke any payments made after that version. However, it only results
+in less money transferred to the receiver so would generally not be in the
+interest of the receiver to do. If it happens, the sender needs to check the
+closure hash and revoke the unsent payments.
+
+All HTTP requests (domain resolution and RPC) must be done over TLS and the
+server-side certificate must be validated.
+
+## Risks
+
+**Cost of capital:**
+The sender must put up capital in advance for payments that
+it intends to make. There is a cost to this since it becomes inaccessible
+until the channel is closed.
+
+**Refund delay:**
+If the receiver disappears, the channel can't be closed immediately.
+The sender has to wait for the *timeout* before the refund transaction can be
+broadcast. If the *timeout* is large, this could capture a significant amount
+of capital in limbo which could be disruptive for the sender.
+
+**Block space congestion**
+If the bitcoin network becomes congested, the block space fee rate could rise
+so that the closure transaction fee is too low to be confirmed quickly.
+The closure transaction could be delayed longer than the *timeout* and the
+sender could then broadcast the refund transaction first (with a higher fee).
+To mitigate this, server should close the channel well before the *timeout*.
+
+**Miner collusion**
+The sender could bribe miners to exclude the closure transaction and then mine
+the refund transaction after the timeout. This could be bone by specifying a
+huge fee in the refund transaction. Currently the mempool rules reject the
+refund transaction before *timeout* has elapsed, but the sender could share it
+directly with miners so that they know to rather skip the closure transaction
+and wait for the big payout.
+
+**Need to monitor blockchain**
+The receive must monitor the blockchain and ensure that it broadcasts the
+closure transaction before the *timeout*. If, for example, the server goes
+offline for an extended period of time, it may miss the window. Therefore, the
+server needs to be reliable and redundant.
+
+**DNS hijacking**
+If the receiver's DNS server is hijacked, an attacker could receive payments
+to new channels that were intended for the real receiver. This is partially
+mitigated by requiring SSL, but if DNS is hijacked, the attacker could quickly
+obtain a valid SSL certificate from Let's Encrypt. A psossible mitigation would
+be to require the server to prove ownership of the target address in
+ValidateResponse before sending the payment.
+
+**Risk of the future**
+Payments are sent over the channel in real time but the channel is only
+finalized some time in the future. Any number of events could occur after the
+channel is open that could disrupt the final closure. For example, a blockchain
+fork could render the closure transaction invalid.
+
+
+## Recommended parameters
+
+**timeout:**
+The sender wants a smaller timeout to reduce its risk of stuck capital if the
+receiver disappears. The receiver wants a larger timeout to ensure it has
+sufficient time for the closure transaction to confirm.
+We recommend a *timeout* of 7 days and for the receiver to close the channel
+after 24 hours. This provides sufficient time for the receiver to recover from
+server outages and some time for network fees to correct after any short-term
+transaction backlog.
+
+**fee:**
+The fee should be chosen to be higher than a typical network fee because of the
+importance of the closure transaction. We recommend choosing the fee rate to be
+50% higher than the fee rate that would be used for normal payments.
 
 
 ## Outstanding issues
@@ -423,3 +559,7 @@ Risks
 - Validate should prove ownership of address by signing a message to avoid domain takeover attacks
 
 
+## References
+
+- [BIP 112, 2015](https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki)
+- [Deployable Lightning, 2015, Rusty Russell](https://github.com/ElementsProject/lightning/blob/master/doc/deployable-lightning.pdf)
