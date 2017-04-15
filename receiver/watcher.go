@@ -15,7 +15,7 @@ func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {
 		return nil
 	}
 
-	timeout := int64(softTimeout)
+	timeout := int64(r.getPolicy().SoftTimeout)
 	if timeout < s.Timeout {
 		timeout = s.Timeout / 2
 	}

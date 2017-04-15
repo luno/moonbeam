@@ -117,6 +117,12 @@ func load(net *chaincfg.Params) (*State, error) {
 
 var globalState *State
 
+func getConfig() channels.SenderConfig {
+	c := channels.DefaultSenderConfig
+	c.Net = getNet().Name
+	return c
+}
+
 func getChannel(id string) (*Channel, *channels.Sender, error) {
 	s, ok := globalState.Channels[id]
 	if !ok {
@@ -128,7 +134,7 @@ func getChannel(id string) (*Channel, *channels.Sender, error) {
 		return nil, nil, err
 	}
 
-	sender, err := channels.NewSender(s.State, privkey)
+	sender, err := channels.LoadSender(getConfig(), s.State, privkey)
 	if err != nil {
 		return nil, nil, err
 	}

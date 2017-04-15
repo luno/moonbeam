@@ -22,12 +22,6 @@ import (
 	"bitbucket.org/bitx/moonchan/storage"
 )
 
-// Policy parameters
-const (
-	softTimeout    = 144
-	fundingMinConf = 3
-)
-
 type Receiver struct {
 	Net            *chaincfg.Params
 	ek             *hdkeychain.ExtendedKey
@@ -209,6 +203,10 @@ func (r *Receiver) get(id string) (*channels.Receiver, error) {
 	return c, nil
 }
 
+func (r *Receiver) getPolicy() policy {
+	return getPolicy(r.Net)
+}
+
 func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	c, err := r.get(req.ID)
 	if err != nil {
@@ -226,10 +224,10 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	if conf < fundingMinConf {
+	if conf < r.getPolicy().FundingMinConf {
 		return nil, errors.New("too few confirmations")
 	}
-	if conf > softTimeout {
+	if conf > r.getPolicy().SoftTimeout {
 		return nil, errors.New("too many confirmations")
 	}
 

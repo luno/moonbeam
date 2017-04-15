@@ -128,6 +128,9 @@ func (s *Sender) GotCreateResponse(resp *models.CreateResponse) error {
 		return errors.New("senderOutput is missing")
 	}
 
+	if !models.ValidateChannelID(resp.ID) {
+		return errors.New("invalid channel ID")
+	}
 	if resp.Version != Version {
 		return errors.New("unsupported version")
 	}

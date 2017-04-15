@@ -102,8 +102,8 @@ func sendToAddress(net *chaincfg.Params, amount int64, addr string) (*wire.TxOut
 	}, nil
 }
 
-func getDataOutput(hash [32]byte) (*wire.TxOut, error) {
-	data := append([]byte{1}, hash[:]...)
+func getDataOutput(version byte, hash [32]byte) (*wire.TxOut, error) {
+	data := append([]byte{version}, hash[:]...)
 	dataScript, err := txscript.NullDataScript(data)
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func (s *SharedState) GetClosureTx(balance int64, hash [32]byte) (*wire.MsgTx, e
 		return nil, err
 	}
 
-	dataout, err := getDataOutput(hash)
+	dataout, err := getDataOutput(byte(s.Version), hash)
 	if err != nil {
 		return nil, err
 	}

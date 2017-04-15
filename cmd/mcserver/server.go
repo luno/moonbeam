@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcrpcclient"
@@ -113,6 +114,12 @@ func main() {
 
 	http.HandleFunc(rpcPath, wrap(ss, rpcHandler))
 	http.HandleFunc(rpcPath+"/", wrap(ss, rpcHandler))
+
+	fullAddr := *listenAddr
+	if strings.HasPrefix(fullAddr, ":") {
+		fullAddr = "127.0.0.1" + fullAddr
+	}
+	log.Printf("Listening on https://%s", fullAddr)
 
 	if *tlsCert == "" {
 		log.Fatal(http.ListenAndServe(*listenAddr, nil))

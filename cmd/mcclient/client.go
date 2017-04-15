@@ -110,8 +110,12 @@ func create(args []string) error {
 		return err
 	}
 
-	net := getNet()
-	s, err := channels.OpenChannel(net, privkey, outputAddr)
+	config := getConfig()
+	s, err := channels.NewSender(config, privkey)
+	if err != nil {
+		return err
+	}
+	req, err := s.GetCreateRequest(outputAddr)
 	if err != nil {
 		return err
 	}
@@ -121,27 +125,12 @@ func create(args []string) error {
 	if err != nil {
 		return err
 	}
-	var req models.CreateRequest
-	req.Version = channels.Version
-	req.Net = net.Name
-	req.SenderPubKey = s.State.SenderPubKey
-	req.SenderOutput = s.State.SenderOutput
-	resp, err := c.Create(req)
+	resp, err := c.Create(*req)
 	if err != nil {
 		return err
 	}
 
-	if !models.ValidateChannelID(resp.ID) {
-		return errors.New("invalid channel ID")
-	}
-
-	receiverPubKey, err := btcutil.NewAddressPubKey(resp.ReceiverPubKey, net)
-	if err != nil {
-		return err
-	}
-	receiverPubKeyBytes := receiverPubKey.PubKey().SerializeCompressed()
-
-	err = s.ReceivedPubKey(receiverPubKeyBytes, resp.ReceiverOutput, resp.Timeout, resp.Fee)
+	err = s.GotCreateResponse(resp)
 	if err != nil {
 		return err
 	}
@@ -187,29 +176,28 @@ func fund(args []string) error {
 	if err != nil {
 		return errors.New("invalid amount")
 	}
-	height := 0
 
 	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
 
-	sig, err := sender.FundingTxMined(txid, uint32(vout), amount, height)
+	req, err := sender.GetOpenRequest(txid, uint32(vout), amount)
 	if err != nil {
 		return err
 	}
+	req.ID = ch.RemoteID
 
 	c, err := getClient(id)
 	if err != nil {
 		return err
 	}
-	req := models.OpenRequest{
-		ID:        ch.RemoteID,
-		TxID:      txid,
-		Vout:      uint32(vout),
-		SenderSig: sig,
+	resp, err := c.Open(*req)
+	if err != nil {
+		return err
 	}
-	if _, err := c.Open(req); err != nil {
+
+	if err := sender.GotOpenResponse(resp); err != nil {
 		return err
 	}
 
@@ -239,11 +227,6 @@ func send(args []string) error {
 		id = ids[0]
 	}
 
-	ch, sender, err := getChannel(id)
-	if err != nil {
-		return err
-	}
-
 	p := models.Payment{
 		Amount: amount,
 		Target: target,
@@ -253,7 +236,12 @@ func send(args []string) error {
 		return err
 	}
 
-	if _, err := sender.PrepareSend(p.Amount, payment); err != nil {
+	ch, sender, err := getChannel(id)
+	if err != nil {
+		return err
+	}
+
+	if _, err := sender.GetSendRequest(p.Amount, payment); err != nil {
 		return err
 	}
 
@@ -304,10 +292,11 @@ func flush(id string) error {
 		return err
 	}
 
-	sig, err := sender.PrepareSend(p.Amount, payment)
+	sendReq, err := sender.GetSendRequest(p.Amount, payment)
 	if err != nil {
 		return err
 	}
+	sendReq.ID = ch.RemoteID
 
 	// Either the payment has been sent or it hasn't. Find out which one.
 
@@ -328,16 +317,11 @@ func flush(id string) error {
 	if serverBal == sender.State.Balance {
 		// Pending payment doesn't reflect yet. We have to retry.
 
-		req := models.SendRequest{
-			ID:        ch.RemoteID,
-			Payment:   payment,
-			SenderSig: sig,
-		}
-		if _, err := c.Send(req); err != nil {
+		if _, err := c.Send(*sendReq); err != nil {
 			return err
 		}
 
-		if err := sender.SendAccepted(p.Amount, payment); err != nil {
+		if err := sender.GotSendResponse(p.Amount, payment, nil); err != nil {
 			return err
 		}
 
@@ -346,7 +330,7 @@ func flush(id string) error {
 	} else if serverBal == sender.State.Balance+p.Amount {
 		// Pending payment reflects. Finalize our side.
 
-		if err := sender.SendAccepted(p.Amount, payment); err != nil {
+		if err := sender.GotSendResponse(p.Amount, payment, nil); err != nil {
 			return err
 		}
 
@@ -369,19 +353,22 @@ func closeAction(args []string) error {
 		return err
 	}
 
+	req, err := sender.GetCloseRequest()
+	if err != nil {
+		return err
+	}
+	req.ID = ch.RemoteID
+
 	c, err := getClient(id)
 	if err != nil {
 		return err
 	}
-	req := models.CloseRequest{
-		ID: ch.RemoteID,
-	}
-	resp, err := c.Close(req)
+	resp, err := c.Close(*req)
 	if err != nil {
 		return err
 	}
 
-	if err := sender.CloseReceived(resp.CloseTx); err != nil {
+	if err := sender.GotCloseResponse(resp); err != nil {
 		return err
 	}
 
@@ -430,7 +417,7 @@ func status(args []string) error {
 	}
 
 	if isClosing(serverStatus) && !isClosing(sender.State.Status) {
-		if err := sender.Close(); err != nil {
+		if _, err := sender.GetCloseRequest(); err != nil {
 			return err
 		}
 		return storeChannel(id, sender.State)
@@ -457,7 +444,7 @@ func refund(args []string) error {
 		if err != nil {
 			return errors.New("invalid amount")
 		}
-		_, err = sender.FundingTxMined(txid, uint32(vout), amount, 0)
+		_, err = sender.GetOpenRequest(txid, uint32(vout), amount)
 		if err != nil {
 			return err
 		}
