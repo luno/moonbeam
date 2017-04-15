@@ -108,7 +108,7 @@ func getDataOutput(hash [32]byte) (*wire.TxOut, error) {
 	}
 
 	return &wire.TxOut{
-		Value:    1,
+		Value:    0,
 		PkScript: dataScript,
 	}, nil
 }
@@ -295,10 +295,6 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 		return errors.New("tx too big")
 	}
 	for _, txout := range tx.TxOut {
-		if txout.Value <= 0 {
-			return errors.New("output value not positive")
-		}
-
 		sc := txscript.GetScriptClass(txout.PkScript)
 		if sc != txscript.PubKeyHashTy && sc != txscript.ScriptHashTy && sc != txscript.NullDataTy {
 			return errors.New("unsupported tx out script class")

@@ -34,6 +34,8 @@ func (s Status) String() string {
 }
 
 const (
+	Version = 1
+
 	DefaultTimeout = 144
 	CloseWindow    = 36
 
@@ -68,7 +70,7 @@ func (ss *SharedState) validateAmount(amount int64) (int64, error) {
 
 func DefaultState(net *chaincfg.Params) SharedState {
 	return SharedState{
-		Version: 1,
+		Version: Version,
 		Net:     netName(net),
 		Timeout: DefaultTimeout,
 		Fee:     75000,

@@ -34,9 +34,9 @@ type SharedState struct {
 }
 
 func (ss *SharedState) GetNet() (*chaincfg.Params, error) {
-	if ss.Net == netMain {
+	if ss.Net == NetMain {
 		return &chaincfg.MainNetParams, nil
-	} else if ss.Net == netTestnet3 {
+	} else if ss.Net == NetTestnet3 {
 		return &chaincfg.TestNet3Params, nil
 	} else {
 		return nil, errors.New("invalid net")
@@ -60,15 +60,15 @@ func (ss *SharedState) ReceiverAddressPubKey() (*btcutil.AddressPubKey, error) {
 }
 
 const (
-	netMain     = "main"
-	netTestnet3 = "testnet3"
+	NetMain     = "mainnet"
+	NetTestnet3 = "testnet3"
 )
 
 func netName(net *chaincfg.Params) string {
 	if net == &chaincfg.MainNetParams {
-		return netMain
+		return NetMain
 	} else if net == &chaincfg.TestNet3Params {
-		return netTestnet3
+		return NetTestnet3
 	} else {
 		return ""
 	}

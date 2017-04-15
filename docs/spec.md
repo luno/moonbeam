@@ -4,6 +4,10 @@
 
 The Moonbeam system allows for off-chain payments between two untrusted parties using Bitcoin payment channels. The system is suited for use between multi-user platforms such as hosted wallets, exchanges and payment processors. It can be deployed on the Bitcoin network as is today.
 
+## Status
+
+Draft
+
 ## Introduction
 
 Moonbeam builds on the concept of payment channels in Bitcoin.
@@ -92,11 +96,11 @@ These values are shared between the sender and receiver.
 
 <dl>
   <dt>timeout</dt>
-  <dd>integer number of blocks until the sender can send the refund transaction</dd>
+  <dd>Integer number of blocks until the sender can send the refund transaction</dd>
   <dt>fee</dt>
-  <dd>integer number of Satoshis to pay the network fee for the closure transaction</dd>
-  <dt>dustThreshold</dt>
-  <dd>minimum number of Satoshis for closure transaction outputs</dd>
+  <dd>Integer number of Satoshis to pay the network fee for the closure transaction</dd>
+  <dt>net</dt>
+  <dd>Bitcoin network to use: "mainnet" or "testnet3"</dd>
 </dl>
 
 ### Channel status
@@ -160,6 +164,15 @@ These values are updated as payments are sent through the channel.
   <dd>sender’s signature for the closure transaction</dd>
 </dl>
 
+### Constants
+
+The values defined as constants. They can't be varied per channel.
+
+<dl>
+  <dt>dustThreshold = 546</dt>
+  <dd>minimum number of Satoshis for closure transaction outputs</dd>
+</dl>
+
 ## Transaction scripts
 
 ### Funding output P2SH public key script
@@ -205,7 +218,7 @@ Push <redeemScript>
 ```
 
 Output 1:
-Pay 1 Satoshi to a null data script with data 0x01 + _paymentsHash_
+Pay 0 Satoshi to a null data script with data 0x01 + _paymentsHash_
 
 Output 2:
 Pay *balance* to address _receiverOutput_.
@@ -256,6 +269,8 @@ _paymentsHash_ ← SHA256(serialize(_p_), _paymentsHash_)
 Note that since the serialization of _p_ is not unique, the raw serialized data received from the sender should be used.
 
 Both the sender and receiver should store their entire history of payments in raw serialized form so that it’s possible to recompute the hash. This is useful if there is a dispute. The hashes can be compared to the null data output of the closure transaction to verify which list of payments is correct.
+
+The maximum acceptable serialized payment is 2^16 - 1 = 65535 bytes.
 
 ## RPC Protocol
 
@@ -510,6 +525,9 @@ to broadcast it to close the channel.
 
 All HTTP requests (domain resolution and RPC) must be done over TLS and the
 server-side certificate must be validated.
+
+All values transmitted between the sender and receiver must obviously be
+validated and range checked.
 
 ## Risks
 

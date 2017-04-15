@@ -122,6 +122,8 @@ func create(args []string) error {
 		return err
 	}
 	var req models.CreateRequest
+	req.Version = channels.Version
+	req.Net = net.Name
 	req.SenderPubKey = s.State.SenderPubKey
 	req.SenderOutput = s.State.SenderOutput
 	resp, err := c.Create(req)

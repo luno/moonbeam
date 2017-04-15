@@ -89,6 +89,13 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
+	if req.Version != channels.Version {
+		return nil, errors.New("unsupported version")
+	}
+	if req.Net != r.Net.Name {
+		return nil, errors.New("unsupported network")
+	}
+
 	ss := channels.DefaultState(r.Net)
 	ss.SenderPubKey = req.SenderPubKey
 	ss.SenderOutput = req.SenderOutput
@@ -130,6 +137,8 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 
 	resp := models.CreateResponse{
 		ID:             rec.ID,
+		Version:        c.State.Version,
+		Net:            c.State.Net,
 		Timeout:        c.State.Timeout,
 		Fee:            c.State.Fee,
 		ReceiverPubKey: c.State.ReceiverPubKey,
