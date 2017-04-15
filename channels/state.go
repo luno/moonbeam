@@ -59,6 +59,11 @@ func (ss *SharedState) ReceiverAddressPubKey() (*btcutil.AddressPubKey, error) {
 	return btcutil.NewAddressPubKey(ss.ReceiverPubKey, net)
 }
 
+func (ss *SharedState) sanityCheck() error {
+	// TODO: check that the right fields are filled in for the status
+	return nil
+}
+
 const (
 	NetMain     = "mainnet"
 	NetTestnet3 = "testnet3"

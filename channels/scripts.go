@@ -13,10 +13,12 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
-// Typical close tx size: 418 bytes
-// Typical refund tx size: 297 bytes
-
 const dustThreshold = 546
+
+const (
+	typicalCloseTxSize  = 418
+	typicalRefundTxSize = 297
+)
 
 func fundingTxScript(senderPubKey, receiverPubKey *btcutil.AddressPubKey, timeout int64) ([]byte, error) {
 	b := txscript.NewScriptBuilder()
@@ -273,6 +275,11 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 		return err
 	}
 
+	txid, err := chainhash.NewHashFromStr(s.FundingTxID)
+	if err != nil {
+		return err
+	}
+
 	var tx wire.MsgTx
 	if err := tx.BtcDecode(bytes.NewReader(rawTx), 2); err != nil {
 		return err
@@ -280,6 +287,10 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 
 	if len(tx.TxIn) != 1 {
 		return errors.New("wrong number of inputs")
+	}
+	op := tx.TxIn[0].PreviousOutPoint
+	if op.Hash != *txid || op.Index != s.FundingVout {
+		return errors.New("does not spend funding output")
 	}
 
 	engine, err := txscript.NewEngine(pkscript, &tx, 0, txscript.StandardVerifyFlags, nil)
@@ -308,4 +319,12 @@ func (s *SharedState) validateTx(rawTx []byte) error {
 	}
 
 	return nil
+}
+
+func validateSenderSig(ss SharedState, privKey *btcec.PrivateKey) error {
+	rawTx, err := ss.GetClosureTxSigned(ss.Balance, ss.PaymentsHash, ss.SenderSig, privKey)
+	if err != nil {
+		return err
+	}
+	return ss.validateTx(rawTx)
 }

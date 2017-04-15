@@ -1,17 +1,20 @@
 package channels
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
+
+	"bitbucket.org/bitx/moonchan/models"
 )
 
 const addr1 = "mrreYyaosje7fxCLi3pzknasHiSfziX9GY"
 const addr2 = "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5"
 
 var testPayment = []byte{1, 2, 3}
+
+const testCapacity = 1000000
 
 func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 	net := &chaincfg.TestNet3Params
@@ -30,107 +33,90 @@ func setUp(t *testing.T) (*chaincfg.Params, *btcutil.WIF, *btcutil.WIF) {
 	return net, senderWIF, receiverWIF
 }
 
-func TestImmediateClose(t *testing.T) {
-	net, senderWIF, receiverWIF := setUp(t)
+func setUpChannel(t *testing.T, capacity int64) (*Sender, *Receiver) {
+	_, senderWIF, receiverWIF := setUp(t)
 
-	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
+	s, err := NewSender(DefaultSenderConfig, senderWIF.PrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq, err := s.GetCreateRequest(addr1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ss := s.State
-	ss.ReceiverOutput = addr2
-	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
+	r, err := NewReceiver(DefaultReceiverConfig, receiverWIF.PrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
+	createResp, err := r.Create(addr2, createReq)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	_, addr, err := s.State.GetFundingScript()
-	if err != nil {
+	if err := s.GotCreateResponse(createResp); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("funding address: %s", addr)
 
 	const (
-		txid   = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
-		vout   = 1
-		amount = 1000000
-		height = 100
+		txid = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout = 1
 	)
-	sig, err := s.FundingTxMined(txid, vout, amount, height)
+
+	openReq, err := s.GetOpenRequest(txid, vout, capacity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Open(txid, vout, amount, height, sig); err != nil {
-		t.Fatal(err)
-	}
-
-	closeTx, err := r.Close()
+	openResp, err := r.Open(capacity, openReq)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("closeTx: %s", hex.EncodeToString(closeTx))
-
-	if err := s.State.validateTx(closeTx); err != nil {
-		t.Errorf("validateTx error: %v", err)
-	}
-
-	if err := s.CloseReceived(closeTx); err != nil {
+	if err := s.GotOpenResponse(openResp); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := s.CloseMined(); err != nil {
+	if s.State.Status != StatusOpen {
+		t.Errorf("expected sender to be in open state")
+	}
+	if r.State.Status != StatusOpen {
+		t.Errorf("expected receiver to be in open state")
+	}
+
+	return s, r
+}
+
+func closeChannels(t *testing.T, s *Sender, r *Receiver) {
+	closeReq, err := s.GetCloseRequest()
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.CloseMined(); err != nil {
+	closeResp, err := r.Close(closeReq)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if err := s.GotCloseResponse(closeResp); err != nil {
+		t.Fatal(err)
+	}
+
+	if s.State.Status != StatusClosing {
+		t.Errorf("expected sender to be in closing state")
+	}
+	if r.State.Status != StatusClosing {
+		t.Errorf("expected receiver to be in closing state")
 	}
 }
 
+func TestImmediateClose(t *testing.T) {
+	s, r := setUpChannel(t, testCapacity)
+	closeChannels(t, s, r)
+}
+
 func TestRefund(t *testing.T) {
-	net, senderWIF, receiverWIF := setUp(t)
-
-	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ss := s.State
-	ss.ReceiverOutput = addr2
-	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, addr, err := s.State.GetFundingScript()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("funding address: %s", addr)
-
-	const (
-		txid   = "f4c7b41725dbc9111293a82cae6299aa9e9bf93bc8d46676d4f3a48923329c86"
-		vout   = 0
-		amount = 1000000
-		height = 100
-	)
-	s.FundingTxMined(txid, vout, amount, height)
+	s, r := setUpChannel(t, testCapacity)
 
 	refundTx, err := s.Refund()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("refundTx: %s", hex.EncodeToString(refundTx))
 
 	if err := s.State.validateTx(refundTx); err != nil {
 		t.Errorf("validateTx error: %v", err)
@@ -141,240 +127,127 @@ func TestRefund(t *testing.T) {
 }
 
 func TestSend(t *testing.T) {
-	net, senderWIF, receiverWIF := setUp(t)
-
-	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ss := s.State
-	ss.ReceiverOutput = addr2
-	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, addr, err := s.State.GetFundingScript()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("funding address: %s", addr)
-
-	const (
-		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
-		vout       = 1
-		fundAmount = 1000000
-		height     = 100
-	)
-	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := r.Open(txid, vout, fundAmount, height, sig); err != nil {
-		t.Fatal(err)
-	}
+	s, r := setUpChannel(t, testCapacity)
 
 	const amount = 1000
 
-	sig, err = s.PrepareSend(amount, testPayment)
+	validateReq := &models.ValidateRequest{
+		Payment: testPayment,
+	}
+	validateResp, err := r.Validate(amount, validateReq)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount, testPayment, sig); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.SendAccepted(amount, testPayment); err != nil {
-		t.Fatal(err)
+	if !validateResp.Valid {
+		t.Errorf("Expected valid payment, got: %+v", validateResp)
 	}
 
-	sig, err = s.PrepareSend(amount*2, testPayment)
+	sendReq, err := s.GetSendRequest(amount, testPayment)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount*2, testPayment, sig); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.SendAccepted(amount*2, testPayment); err != nil {
-		t.Fatal(err)
-	}
-
-	closeTx, err := r.Close()
+	sendResp, err := r.Send(amount, sendReq)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("closeTx: %s", hex.EncodeToString(closeTx))
-
-	if err := s.State.validateTx(closeTx); err != nil {
-		t.Errorf("validateTx error: %v", err)
-	}
-
-	if err := s.CloseReceived(closeTx); err != nil {
+	if err := s.GotSendResponse(amount, testPayment, sendResp); err != nil {
 		t.Fatal(err)
 	}
+	if r.State.Balance != amount {
+		t.Errorf("Unexpected receiver balance: %+v", r.State)
+	}
+	if s.State.Balance != amount {
+		t.Errorf("Unexpected sender balance: %+v", s.State)
+	}
 
-	if err := s.CloseMined(); err != nil {
+	sendReq, err = s.GetSendRequest(2*amount, testPayment)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.CloseMined(); err != nil {
+	sendResp, err = r.Send(2*amount, sendReq)
+	if err != nil {
 		t.Fatal(err)
 	}
+	if err := s.GotSendResponse(2*amount, testPayment, sendResp); err != nil {
+		t.Fatal(err)
+	}
+	if r.State.Balance != 3*amount {
+		t.Errorf("Unexpected receiver balance: %+v", r.State)
+	}
+	if s.State.Balance != 3*amount {
+		t.Errorf("Unexpected sender balance: %+v", s.State)
+	}
+
+	if s.State.Status != StatusOpen {
+		t.Errorf("expected sender to be in open state")
+	}
+	if r.State.Status != StatusOpen {
+		t.Errorf("expected receiver to be in open state")
+	}
+
+	closeChannels(t, s, r)
 }
 
 func TestInvalidSendSig(t *testing.T) {
-	net, senderWIF, receiverWIF := setUp(t)
-
-	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ss := s.State
-	ss.ReceiverOutput = addr2
-	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, _, err := s.State.GetFundingScript(); err != nil {
-		t.Fatal(err)
-	}
-
-	const (
-		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
-		vout       = 1
-		fundAmount = 1000000
-		height     = 100
-	)
-	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := r.Open(txid, vout, fundAmount, height, sig); err != nil {
-		t.Fatal(err)
-	}
+	s, r := setUpChannel(t, testCapacity)
 
 	const amount = 1000
 
-	if err := r.Send(amount, testPayment, nil); err == nil {
-		t.Errorf("Expected error due invalid signature")
+	validateReq := &models.ValidateRequest{
+		Payment: testPayment,
 	}
-
-	sig, err = s.PrepareSend(amount*2, testPayment)
+	validateResp, err := r.Validate(amount, validateReq)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount, testPayment, sig); err == nil {
+	if !validateResp.Valid {
+		t.Errorf("Expected valid payment, got: %+v", validateResp)
+	}
+
+	sendReq := &models.SendRequest{
+		Payment: testPayment,
+	}
+	if _, err := r.Send(amount, sendReq); err == nil {
+		t.Errorf("Expected error due invalid signature")
+	}
+
+	sendReq, err = s.GetSendRequest(amount, testPayment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Send(amount*2, sendReq); err == nil {
 		t.Errorf("Expected error due invalid signature")
 	}
 }
 
 func TestSendDust(t *testing.T) {
-	net, senderWIF, receiverWIF := setUp(t)
-
-	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ss := s.State
-	ss.ReceiverOutput = addr2
-	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, _, err := s.State.GetFundingScript(); err != nil {
-		t.Fatal(err)
-	}
-
-	const (
-		txid       = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
-		vout       = 1
-		fundAmount = 1000000
-		height     = 100
-	)
-	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := r.Open(txid, vout, fundAmount, height, sig); err != nil {
-		t.Fatal(err)
-	}
+	s, r := setUpChannel(t, testCapacity)
 
 	const amount = 100
 
-	sig, err = s.PrepareSend(amount, testPayment)
-	if err == nil {
+	if _, err := s.GetSendRequest(amount, testPayment); err == nil {
 		t.Errorf("Expected error due to amount too small")
 	}
 
 	newHash := chainHash(s.State.PaymentsHash, testPayment)
-	sig, err = s.signBalance(amount, newHash)
+	sig, err := s.signBalance(amount, newHash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Send(amount, testPayment, sig); err == nil {
+	sendReq := &models.SendRequest{
+		Payment:   testPayment,
+		SenderSig: sig,
+	}
+	if _, err := r.Send(amount, sendReq); err == nil {
 		t.Errorf("Expected error due to dust output")
 	}
 }
 
-func TestCapacityTooLow(t *testing.T) {
-	net, senderWIF, receiverWIF := setUp(t)
-
-	s, err := OpenChannel(net, senderWIF.PrivKey, addr1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ss := s.State
-	ss.ReceiverOutput = addr2
-	r, err := AcceptChannel(ss, receiverWIF.PrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.ReceivedPubKey(r.State.ReceiverPubKey, addr2, ss.Timeout, ss.Fee)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, _, err := s.State.GetFundingScript(); err != nil {
-		t.Fatal(err)
-	}
-
-	fundAmount := s.State.Fee + dustThreshold - 1
-
-	const (
-		txid   = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
-		vout   = 1
-		height = 100
-	)
-	sig, err := s.FundingTxMined(txid, vout, fundAmount, height)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := r.Open(txid, vout, fundAmount, height, sig); err == nil {
-		t.Errorf("Expected error due to capacity too low")
-	}
-	if r.State.Status != StatusCreated {
-		t.Errorf("Wrong status: %s", r.State.Status)
-	}
+// If the channel was funded with an amount too small for any payments, we can
+// at least still allow the sender to attempt to close it cleanly.
+func TestLowCapacity(t *testing.T) {
+	s, r := setUpChannel(t, dustThreshold)
+	closeChannels(t, s, r)
 }
 
 func TestValidateAmount(t *testing.T) {
