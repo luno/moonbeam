@@ -169,6 +169,8 @@ These values are updated as payments are sent through the channel.
 The values defined as constants. They can't be varied per channel.
 
 <dl>
+  <dt>protocolVersion = 1</dt>
+  <dd>the protocol version</dd>
   <dt>dustThreshold = 546</dt>
   <dd>minimum number of Satoshis for closure transaction outputs</dd>
 </dl>
@@ -218,7 +220,8 @@ Push <redeemScript>
 ```
 
 Output 1:
-Pay 0 Satoshi to a null data script with data 0x01 + _paymentsHash_
+Pay 0 Satoshi to a null data script with data
+_protcolVersion_ (1 byte) + _paymentsHash_ (32 bytes)
 
 Output 2:
 Pay *balance* to address _receiverOutput_.
