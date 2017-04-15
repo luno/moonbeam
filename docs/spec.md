@@ -288,6 +288,9 @@ Initiate a channel opening. This creates a channel in the CREATED state.
 
 ```go
 type CreateRequest struct {
+	Version int    `json:"version"`
+	Net     string `json:"net"`
+
 	SenderPubKey []byte `json:"senderPubKey"`
 	SenderOutput string `json:"senderOutput"`
 }
@@ -295,8 +298,10 @@ type CreateRequest struct {
 type CreateResponse struct {
 	ID string `json:"id"`
 
-	Timeout int64 `json:"timeout"`
-	Fee     int64 `json:"fee"`
+	Version int    `json:"version"`
+	Net     string `json:"net"`
+	Timeout int64  `json:"timeout"`
+	Fee     int64  `json:"fee"`
 
 	ReceiverPubKey []byte `json:"receiverPubKey"`
 	ReceiverOutput string `json:"receiverOutput"`
