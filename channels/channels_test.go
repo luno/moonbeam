@@ -131,15 +131,12 @@ func TestSend(t *testing.T) {
 
 	const amount = 1000
 
-	validateReq := &models.ValidateRequest{
-		Payment: testPayment,
-	}
-	validateResp, err := r.Validate(amount, validateReq)
+	valid, err := r.Validate(amount, testPayment)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !validateResp.Valid {
-		t.Errorf("Expected valid payment, got: %+v", validateResp)
+	if !valid {
+		t.Errorf("Expected valid payment, got: %+v", valid)
 	}
 
 	sendReq, err := s.GetSendRequest(amount, testPayment)
@@ -193,17 +190,6 @@ func TestInvalidSendSig(t *testing.T) {
 
 	const amount = 1000
 
-	validateReq := &models.ValidateRequest{
-		Payment: testPayment,
-	}
-	validateResp, err := r.Validate(amount, validateReq)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !validateResp.Valid {
-		t.Errorf("Expected valid payment, got: %+v", validateResp)
-	}
-
 	sendReq := &models.SendRequest{
 		Payment: testPayment,
 	}
@@ -211,7 +197,7 @@ func TestInvalidSendSig(t *testing.T) {
 		t.Errorf("Expected error due invalid signature")
 	}
 
-	sendReq, err = s.GetSendRequest(amount, testPayment)
+	sendReq, err := s.GetSendRequest(amount, testPayment)
 	if err != nil {
 		t.Fatal(err)
 	}

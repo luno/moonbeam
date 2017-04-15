@@ -22,6 +22,12 @@ import (
 	"bitbucket.org/bitx/moonchan/storage"
 )
 
+// Policy parameters
+const (
+	softTimeout    = 144
+	fundingMinConf = 3
+)
+
 type Receiver struct {
 	Net            *chaincfg.Params
 	ek             *hdkeychain.ExtendedKey
@@ -29,6 +35,7 @@ type Receiver struct {
 	db             storage.Storage
 	dir            *Directory
 	receiverOutput string
+	config         channels.ReceiverConfig
 }
 
 func NewReceiver(net *chaincfg.Params,
@@ -38,6 +45,9 @@ func NewReceiver(net *chaincfg.Params,
 	dir *Directory,
 	destination string) *Receiver {
 
+	config := channels.DefaultReceiverConfig
+	config.Net = net.Name
+
 	return &Receiver{
 		Net:            net,
 		ek:             ek,
@@ -45,6 +55,7 @@ func NewReceiver(net *chaincfg.Params,
 		db:             db,
 		dir:            dir,
 		receiverOutput: destination,
+		config:         config,
 	}
 }
 
@@ -85,21 +96,17 @@ func genChannelID() (string, error) {
 }
 
 func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, error) {
+	// channels.Receiver.Create would validate these fields, but we do it
+	// here anyway because we have to hit the db beforehand.
 	if _, err := btcutil.NewAddressPubKey(req.SenderPubKey, r.Net); err != nil {
 		return nil, err
 	}
-
 	if req.Version != channels.Version {
 		return nil, errors.New("unsupported version")
 	}
-	if req.Net != r.Net.Name {
+	if req.Net != r.config.Net {
 		return nil, errors.New("unsupported network")
 	}
-
-	ss := channels.DefaultState(r.Net)
-	ss.SenderPubKey = req.SenderPubKey
-	ss.SenderOutput = req.SenderOutput
-	ss.ReceiverOutput = r.receiverOutput
 
 	n, err := r.db.ReserveKeyPath()
 	if err != nil {
@@ -110,7 +117,11 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	c, err := channels.AcceptChannel(ss, privKey)
+	c, err := channels.NewReceiver(r.config, privKey)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.Create(r.receiverOutput, &req)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +130,7 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 	if err != nil {
 		return nil, err
 	}
+	resp.ID = id
 
 	rec := storage.Record{
 		ID:          id,
@@ -130,22 +142,7 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	_, addr, err := c.State.GetFundingScript()
-	if err != nil {
-		return nil, err
-	}
-
-	resp := models.CreateResponse{
-		ID:             rec.ID,
-		Version:        c.State.Version,
-		Net:            c.State.Net,
-		Timeout:        c.State.Timeout,
-		Fee:            c.State.Fee,
-		ReceiverPubKey: c.State.ReceiverPubKey,
-		ReceiverOutput: c.State.ReceiverOutput,
-		FundingAddress: addr,
-	}
-	return &resp, nil
+	return resp, nil
 }
 
 func getTxOut(bc *btcrpcclient.Client,
@@ -204,7 +201,7 @@ func (r *Receiver) get(id string) (*channels.Receiver, error) {
 		return nil, err
 	}
 
-	c, err := channels.NewReceiver(rec.SharedState, privKey)
+	c, err := channels.LoadReceiver(r.config, rec.SharedState, privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -229,11 +226,10 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	if conf < channels.MinFundingConf {
+	if conf < fundingMinConf {
 		return nil, errors.New("too few confirmations")
 	}
-	maxConf := c.State.Timeout - channels.CloseWindow
-	if conf > int(maxConf) {
+	if conf > softTimeout {
 		return nil, errors.New("too many confirmations")
 	}
 
@@ -242,18 +238,19 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	err = c.Open(req.TxID, req.Vout, amount, int(height), req.SenderSig)
+	resp, err := c.Open(amount, &req)
 	if err != nil {
 		return nil, err
 	}
 
 	newState := c.State
+	newState.BlockHeight = int(height)
 
 	if err := r.db.Update(req.ID, prevState, newState, nil); err != nil {
 		return nil, err
 	}
 
-	return &models.OpenResponse{}, nil
+	return resp, nil
 }
 
 func (r *Receiver) validate(c *channels.Receiver, payment []byte) (bool, *models.Payment, error) {
@@ -262,7 +259,11 @@ func (r *Receiver) validate(c *channels.Receiver, payment []byte) (bool, *models
 		return false, nil, errors.New("invalid payment")
 	}
 
-	if !c.Validate(p.Amount, payment) {
+	valid, err := c.Validate(p.Amount, payment)
+	if err != nil {
+		return false, nil, err
+	}
+	if !valid {
 		return false, nil, nil
 	}
 	has, err := r.dir.HasTarget(p.Target)
@@ -305,7 +306,8 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		return nil, errors.New("invalid payment")
 	}
 
-	if err := c.Send(p.Amount, req.Payment, req.SenderSig); err != nil {
+	resp, err := c.Send(p.Amount, &req)
+	if err != nil {
 		return nil, err
 	}
 
@@ -315,7 +317,7 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 		return nil, err
 	}
 
-	return &models.SendResponse{}, nil
+	return resp, nil
 }
 
 func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error) {
@@ -325,12 +327,12 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 	}
 	prevState := c.State
 
-	rawTx, err := c.Close()
+	resp, err := c.Close(&req)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("closeTx: %s", hex.EncodeToString(rawTx))
+	log.Printf("closeTx: %s", hex.EncodeToString(resp.CloseTx))
 
 	newState := c.State
 
@@ -339,7 +341,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 	}
 
 	var tx wire.MsgTx
-	err = tx.BtcDecode(bytes.NewReader(rawTx), wire.ProtocolVersion)
+	err = tx.BtcDecode(bytes.NewReader(resp.CloseTx), wire.ProtocolVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +352,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 	}
 	log.Printf("closeTx txid: %s", txid.String())
 
-	return &models.CloseResponse{rawTx}, nil
+	return resp, nil
 }
 
 func (r *Receiver) Status(req models.StatusRequest) (*models.StatusResponse, error) {

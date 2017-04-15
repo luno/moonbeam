@@ -171,37 +171,31 @@ func (r *Receiver) Open(amount int64, req *models.OpenRequest) (*models.OpenResp
 	return &models.OpenResponse{}, nil
 }
 
-func (r *Receiver) validate(amount int64, payment []byte) bool {
+func (r *Receiver) Validate(amount int64, payment []byte) (bool, error) {
+	if r.State.Status != StatusOpen {
+		return false, ErrNotStatusOpen
+	}
+
 	if _, err := r.State.validateAmount(amount); err != nil {
-		return false
+		return false, nil
 	}
 
 	if !validatePaymentSize(len(payment)) {
-		return false
+		return false, nil
 	}
 
-	return true
-}
-
-func (r *Receiver) Validate(amount int64, req *models.ValidateRequest) (*models.ValidateResponse, error) {
-	if r.State.Status != StatusOpen {
-		return nil, ErrNotStatusOpen
-	}
-
-	if !r.validate(amount, req.Payment) {
-		// Should we return valid=false instead of an error?
-		// No, because the sender should have already done these checks.
-		return nil, errors.New("invalid payment")
-	}
-
-	return &models.ValidateResponse{Valid: true}, nil
+	return true, nil
 }
 
 func (r *Receiver) Send(amount int64, req *models.SendRequest) (*models.SendResponse, error) {
 	if r.State.Status != StatusOpen {
 		return nil, ErrNotStatusOpen
 	}
-	if !r.validate(amount, req.Payment) {
+	valid, err := r.Validate(amount, req.Payment)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
 		return nil, errors.New("invalid payment")
 	}
 

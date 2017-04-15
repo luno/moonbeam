@@ -15,7 +15,11 @@ func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {
 		return nil
 	}
 
-	cutoff := int64(s.BlockHeight) + s.Timeout - channels.CloseWindow
+	timeout := int64(softTimeout)
+	if timeout < s.Timeout {
+		timeout = s.Timeout / 2
+	}
+	cutoff := int64(s.BlockHeight) + timeout
 
 	if blockCount < cutoff {
 		return nil
