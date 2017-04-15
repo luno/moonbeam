@@ -12,6 +12,12 @@ payments to servers. The server in this context would usually be a multi-user
 platform so that the channel can be used to send payments to any of the users
 on the platform.
 
+## Conventions
+
+This specification defines various data structures. These are described by
+structs in the Go language syntax. These structures are serialized into
+JSON format when used in the protocol.
+
 ## Definitions
 
 <dl>
@@ -50,7 +56,7 @@ This URL should be fetched over HTTPS, ensuring that the remote server certifica
 
 The `moonbeam.json` document has this structure:
 
-```
+```go
 type Domain struct {
 	Receivers []DomainReceiver `json:"receivers"`
 }
@@ -61,7 +67,7 @@ type DomainReceiver struct {
 ```
 
 Example:
-```
+```json
 {
   "receivers": [
     {
@@ -88,35 +94,40 @@ These values are shared between the sender and receiver.
   <dt>timeout</dt>
   <dd>integer number of blocks until the sender can send the refund transaction</dd>
   <dt>fee</dt>
-  <dd>integer number of satoshis to pay the network fee for the closure transaction</dd>
+  <dd>integer number of Satoshis to pay the network fee for the closure transaction</dd>
+  <dt>dustThreshold</dt>
+  <dd>minimum number of Satoshis for closure transaction outputs</dd>
 </dl>
 
 ### Channel status
 
 <dl>
   <dt>status</dt>
-  <dd>The current state of the channel.</dd>
+  <dd>
+    The current state of the channel.
+    <dl>
+     <dt>CREATED = 1</dt>
+     <dd>channel has been initiated but not yet open for payments</dd>
+     <dt>OPEN = 2</dt>
+     <dd>the funding transaction has been mined and the channel is open for payments</dd>
+     <dt>CLOSING = 3</dt>
+     <dd>the closure or refund transaction has been broadcast</dd>
+     <dt>CLOSED = 4</dt>
+     <dd>the closure or refund transaction has been mined</dd>
+    </dl>
+  </dd>
 </dl>
 
-<dl>
-  <dt>CREATED = 1</dt>
-  <dd>channel has been initiated but not yet open for payments</dd>
-  <dt>OPEN = 2</dt>
-  <dd>the funding transaction has been mined and the channel is open for payments</dd>
-  <dt>CLOSING = 3</dt>
-  <dd>the closure or refund transaction has been broadcast</dd>
-  <dt>CLOSED = 4</dt>
-  <dd>the closure or refund transaction has been mined</dd>
-</dl>
 
 ### Channel setup
 
 Sender and receiver public keys:
 <dl>
   <dt>senderPubKey</dt>
+  <dd>sender's public key</dd>
   <dt>receiverPubKey</dt>
+  <dd>receiver's public key</dd>
 </dl>
-New keys must be generated for each new channel.
 
 Output addresses:
 <dl>
@@ -142,20 +153,20 @@ These values are updated as payments are sent through the channel.
 
 <dl>
   <dt>balance</dt>
-  <dd>integer number of Satoshi assigned from the sender to the receiver</dd>
+  <dd>integer number of Satoshi assigned from the sender to the receiver, initially 0</dd>
   <dt>paymentsHash</dt>
-  <dd>a hash of the details of all the payments that make up the balance</dd>
+  <dd>a hash of the details of all the payments that make up the balance, initially 32 zero bytes</dd>
   <dt>senderSig</dt>
   <dd>sender’s signature for the closure transaction</dd>
 </dl>
-
-The initial _balance_ is 0 and the initial _paymentsHash_ is 32 zero bytes.
 
 ## Transaction scripts
 
 ### Funding output P2SH public key script
 
 The funding transaction is sent to the P2SH address of this script.
+It allows the capital to be spent either a) immediately with agreement of both
+the sender and receiver, or b) by the sender after a delay of *timeout* blocks.
 
 ```
 OP_IF
@@ -178,6 +189,12 @@ OP_ENDIF
 
 ### Closure transaction
 
+The closure transaction is used to close the channel by sending the *balance*
+to the receiver and the remaining capital as change to the sender. It must
+be signed by both the sender and receiver. There is also an additional
+null data output containing *paymentsHash* to identify the set of payments
+being settled.
+
 Input 1:
 ```
 OP_FALSE
@@ -191,20 +208,24 @@ Output 1:
 Pay 1 Satoshi to a null data script with data 0x01 + _paymentsHash_
 
 Output 2:
-Pay balance to address _receiverOutput_.
+Pay *balance* to address _receiverOutput_.
 
 Output 3:
 Pay _capacity - balance - fee_ to address _senderOutput_.
 
 
 If an output amount is zero, that output is omitted.
-If an output amount is less than the dust threshold, that output is omitted and the amount is added to the network fee.
+If an output amount is less than the *dustThreshold*,
+that output is omitted and the amount is added to the network fee.
 
 ### Refund transaction
 
-The input sequence must be equal to timeout.
+The refund transaction is used by the sender to refund the capital if the
+receiver fails to close the channel. It only becomes valid after the *timeout*
+has elapsed.
 
 Input 1:
+The input sequence must be set to *timeout*.
 ```
 Push <senderSig>
 Push <senderPubKey>
@@ -220,10 +241,10 @@ Any
 
 Payment details are represented by this structure:
 
-```
+```go
 type Payment struct {
-	Amount int64  `json:"amount"`
-	Target string `json:"target"`
+	Amount int64  `json:"amount"`  // amount in Satoshis
+	Target string `json:"target"`  // Moonbeam address
 }
 ```
 
@@ -250,7 +271,7 @@ Initiate a channel opening. This creates a channel in the CREATED state.
 
 `POST <endpoint>`
 
-```
+```go
 type CreateRequest struct {
 	SenderPubKey []byte `json:"senderPubKey"`
 	SenderOutput string `json:"senderOutput"`
@@ -275,7 +296,7 @@ After the funding transaction has been mined, this moves the channel to the OPEN
 
 `PATCH <endpoint>/<channel_id>`
 
-```
+```go
 type OpenRequest struct {
 	ID string `json:"id"`
 
@@ -295,7 +316,7 @@ Validate checks whether a payment would be accepted if it is sent.
 
 `PATCH <endpoint>/<channel_id>`
 
-```
+```go
 type ValidateRequest struct {
 	ID string `json:"id"`
 
@@ -313,7 +334,7 @@ Send a payment and update the channel balance.
 
 `POST <endpoint>/<channel_id>`
 
-```
+```go
 type SendRequest struct {
 	ID string `json:"id"`
 
@@ -334,7 +355,7 @@ Request the server to close the connection.
 
 `DELETE <endpoint>/<channel_id>`
 
-```
+```go
 type CloseRequest struct {
 	ID string `json:"id"`
 }
@@ -350,7 +371,7 @@ Get the channel status and balance.
 
 `GET <endpoint>/<channel_id>`
 
-```
+```go
 type StatusRequest struct {
 	ID string `json:"id"`
 }
@@ -418,12 +439,12 @@ The following procedure should be used to send a payment:
 3. The sender calls the Validate RPC call to verify that the server will accept the payment.
 4. The receiver stores the payment in durable storage.
 5. Loop:
-  1. Call the Status RPC to get the server’s view of the channel state
-  2. If the server’s balance = local balance:
-    1. Call the Send RPC to send the payment
-  3. If the server’s balance = local balance + payment amount
-    4. Update the local state to include the payment
-    5. Exit the loop
+    1. Call the Status RPC to get the server’s view of the channel state
+    2. If the server’s balance = local balance:
+        1. Call the Send RPC to send the payment
+    3. If the server’s balance = local balance + payment amount
+        1. Update the local state to include the payment
+        2. Exit the loop
 
 After the first Send RPC call, whether it succeeds or not, we are committed to sending the payment. If we are unable to send it successfully, the only other option is the close the channel. This is done to avoid an attack described later. The Validate RPC call is needed to prevent denial of service if one the sender’s users requests a payment to an invalid address.
 
@@ -483,6 +504,10 @@ in less money transferred to the receiver so would generally not be in the
 interest of the receiver to do. If it happens, the sender needs to check the
 closure hash and revoke the unsent payments.
 
+The receiver must always check that the signed closure transaction is considered
+"standard" by the bitcoin network mempool rules. Otherwise, it may be unable
+to broadcast it to close the channel.
+
 All HTTP requests (domain resolution and RPC) must be done over TLS and the
 server-side certificate must be validated.
 
@@ -532,7 +557,8 @@ ValidateResponse before sending the payment.
 Payments are sent over the channel in real time but the channel is only
 finalized some time in the future. Any number of events could occur after the
 channel is open that could disrupt the final closure. For example, a blockchain
-fork could render the closure transaction invalid.
+fork could render the closure transaction invalid, or changes to mempool
+acceptance rules could disrupt closure transactions.
 
 
 ## Recommended parameters
@@ -551,6 +577,27 @@ The fee should be chosen to be higher than a typical network fee because of the
 importance of the closure transaction. We recommend choosing the fee rate to be
 50% higher than the fee rate that would be used for normal payments.
 
+
+### Receiver policy parameters
+
+These are parameters that aren't technically required to be shared for the
+channel to operate. However, it can be helpful for the sender to know them
+e.g. to avoid using more capital than necessary.
+
+<dl>
+  <dt>softTimeout</dt>
+  <dd>block count after which the receiver will close the channel</dd>
+  <dt>paymentsMaxCount</dt>
+  <dd>maximum number of payments before the receiver will close the channel</dd>
+  <dt>balanceMax</td>
+  <dd>maximum balance after which the receiver will close the channel</dd>
+  <dt>fundingMinConf</dt>
+  <dd>minimum number of confirmations that the receiver will accept for the funding transaction</dd>
+  <dt>paymentMinAmount</dt>
+  <dd>minimum transaction amount that the receiver will accept</dd>
+  <dt>paymentMaxAmount</dt>
+  <dd>Maximum transaction amount that the receiver will accept. zero means there is no maximum.</dd>
+</dl>
 
 ## Outstanding issues
 
