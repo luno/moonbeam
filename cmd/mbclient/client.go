@@ -25,6 +25,7 @@ import (
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
+var tlsSkipVerify = flag.Bool("tls_skip_verify", false, "Whether to validate the server's TLS cert")
 
 func getNet() *chaincfg.Params {
 	if *testnet {
@@ -64,7 +65,7 @@ func loadkey(s *State, n int) (*btcec.PrivateKey, *btcutil.AddressPubKey, error)
 }
 
 func getHttpClient() *http.Client {
-	if *testnet {
+	if *tlsSkipVerify {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
