@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"bitbucket.org/bitx/moonchan/models"
+	"bitbucket.org/bitx/moonchan/receiver"
 )
 
 var debugServerRPC = flag.Bool(
@@ -89,7 +90,12 @@ func respond(w http.ResponseWriter, r *http.Request, resp interface{}, err error
 		if *debugServerRPC {
 			log.Printf("error: %v", err)
 		}
-		http.Error(w, "error", http.StatusInternalServerError)
+
+		if ee, ok := err.(receiver.ExposableError); ok {
+			http.Error(w, ee.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, "error", http.StatusInternalServerError)
+		}
 	} else {
 		err := json.NewEncoder(w).Encode(resp)
 		if err != nil {

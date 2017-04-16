@@ -64,12 +64,16 @@ func (c *Client) do(method, path string, authToken string, req, resp interface{}
 	}
 
 	if *debugRPC {
-		log.Printf("moonchan/client: Response from %s %s: %s\n%s\n",
+		log.Printf("moonchan/client: %s %s\n%s\n%s\n",
 			method, url, hresp.Status, string(respBuf))
 	}
 
 	if hresp.StatusCode != http.StatusOK {
-		return fmt.Errorf("moonchan/client: http error code %d", hresp.StatusCode)
+		if len(respBuf) > 256 {
+			respBuf = respBuf[:256]
+		}
+		return fmt.Errorf("moonchan/client: http error code %d: %s",
+			hresp.StatusCode, string(respBuf))
 	}
 
 	return json.Unmarshal(respBuf, resp)

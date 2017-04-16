@@ -157,11 +157,11 @@ func getTxOut(bc *btcrpcclient.Client, txid string, vout uint32) (*wire.TxOut, i
 		return nil, 0, "", err
 	}
 	if txout == nil {
-		return nil, 0, "", errors.New("cannot find utxo")
+		return nil, 0, "", NewExposableError("confirmed utxo not found")
 	}
 
 	if txout.Coinbase {
-		return nil, 0, "", errors.New("cannot use coinbase")
+		return nil, 0, "", NewExposableError("cannot use coinbase utxo")
 	}
 
 	pkscript, err := hex.DecodeString(txout.ScriptPubKey.Hex)
@@ -223,10 +223,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	}
 
 	if conf < r.getPolicy().FundingMinConf {
-		return nil, errors.New("too few confirmations")
-	}
-	if conf > r.getPolicy().SoftTimeout {
-		return nil, errors.New("too many confirmations")
+		return nil, NewExposableError("too few confirmations")
 	}
 
 	height, err := getHeight(r.bc, blockHash)
@@ -250,15 +247,17 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	newState := c.State
-	newState.BlockHeight = int(height)
+	c.State.BlockHeight = int(height)
+	if conf > r.getPolicy().SoftTimeout {
+		c.State.Status = channels.StatusClosing
+	}
 
 	id := getChannelID(req.TxID, req.Vout)
 
 	rec := storage.Record{
 		ID:          id,
 		KeyPath:     keyPath,
-		SharedState: newState,
+		SharedState: c.State,
 	}
 
 	if err := r.db.Create(rec); err != nil {
