@@ -2,13 +2,14 @@
 
 ## Installation
 
-```
+```bash
 git clone git@bitbucket.org:bitx/moonchan.git
 cd moonchan
 source ./vars.sh
 go get github.com/btcsuite/btcutil
 go get github.com/btcsuite/btcrpcclient
 go install moonchan/cmd/mcclient
+go install moonchan/cmd/mcserver
 ```
 
 ## Client Guide
@@ -24,7 +25,7 @@ should be kept safe and be backed-up.
 First we need to initiate a channel opening to a remote server. In this case,
 https://bitcoinmoonbeam.org:
 
-```
+```bash
 ./bin/mcclient create bitcoinmoonbeam.org <refundaddr>
 ```
 
@@ -35,7 +36,7 @@ The funding address and channel ID are printed if successful.
 
 To see the channel info, you can run:
 
-```
+```bash
 ./bin/mcclient list -a
 ```
 
@@ -44,26 +45,26 @@ https://bitcoinmoonbeam.org/channels
 
 ### Fund the channel
 
-Now you need to send some coins to the funding address. You can send any amount
-- whatever amount will be the maximum channel capacity. You can send it using
+Now you need to send some coins to the funding address. You can send any amount.
+This amount will be the maximum channel capacity. You can send it from
 any wallet.
 
 You must wait for the transaction to confirm before proceeding.
 Once the transaction has confirmed run:
 
-```
+```bash
 ./bin/mcclient fund <id> <txid> <vout> <amount_in_satoshi>
 ```
 
 If successful, the channel is now open. To see your open channels, run:
 
-```
+```bash
 ./bin/mcclient list
 ```
 
 To get more info about this particular channel, run:
 
-```
+```bash
 ./bin/mcclient show <id>
 ```
 
@@ -71,7 +72,7 @@ To get more info about this particular channel, run:
 
 Now that the channel is open, you can send payments:
 
-```
+```bash
 ./bin/mcclient send test@bitcoinmoonbeam.org 1000
 ```
 
@@ -84,9 +85,37 @@ https://bitcoinmoonbeam.org/payments
 
 Once you're done, you can close the channel:
 
-```
+```bash
 ./bin/mcclient close <id>
 ```
 
 This will print the closure transaction. The server should submit it to the
 network, but you can broadcast it yourself too.
+
+## Server Guide
+
+The reference server requires access to a bitcoin daemon via JSON-RPC.
+It stores its stage in a file called `server-state.json`.
+You can configure the server through flags.
+
+To start the server:
+
+```bash
+./bin/mcserver
+```
+
+You can then view the server status by visting https://127.0.0.1:3211.
+By default, a self-signed SSL certificate is used, which you'll have to bypass
+in your browser in order to view the page.
+
+The available configuration flags can be found by running
+
+```bash
+./bin/mcserver --help
+```
+
+To create a channel to your test server, run:
+
+```bash
+./bin/mcclient create https://127.0.0.1:3211/moonbeamrpc <refundaddr>
+```
