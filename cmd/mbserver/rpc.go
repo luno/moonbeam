@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"bitbucket.org/bitx/moonchan/models"
@@ -31,8 +33,41 @@ func parse(w http.ResponseWriter, r *http.Request, req interface{}) bool {
 	return true
 }
 
-func checkID(w http.ResponseWriter, a, b string) bool {
-	if a != b {
+func splitTxIDVout(txidvout string) (string, uint32, bool) {
+	i := strings.Index(txidvout, "-")
+	if i < 0 {
+		return "", 0, false
+	}
+
+	txid := txidvout[:i]
+	vouts := txidvout[i+1:]
+
+	if len(txid) != 64 {
+		return "", 0, false
+	}
+	if txid != strings.ToLower(txid) {
+		return "", 0, false
+	}
+	if _, err := hex.DecodeString(txid); err != nil {
+		return "", 0, false
+	}
+
+	if len(vouts) == 0 {
+		return "", 0, false
+	}
+	vout, err := strconv.Atoi(vouts)
+	if err != nil {
+		return "", 0, false
+	}
+	if vout < 0 {
+		return "", 0, false
+	}
+
+	return txid, uint32(vout), true
+}
+
+func checkID(w http.ResponseWriter, atxid string, avout uint32, btxid string, bvout uint32) bool {
+	if !(atxid == btxid && avout == bvout) {
 		http.Error(w, "URL doesn't match channel ID", http.StatusBadRequest)
 		return false
 	}
@@ -62,60 +97,60 @@ func rpcCreateHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 	respond(w, r, resp, err)
 }
 
-func rpcOpenHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+func rpcOpenHandler(s *ServerState, w http.ResponseWriter, r *http.Request, txid string, vout uint32) {
 	var req models.OpenRequest
 	if !parse(w, r, &req) {
 		return
 	}
-	if !checkID(w, req.ID, id) {
+	if !checkID(w, txid, vout, req.TxID, req.Vout) {
 		return
 	}
 	resp, err := s.Receiver.Open(req)
 	respond(w, r, resp, err)
 }
 
-func rpcValidateHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+func rpcValidateHandler(s *ServerState, w http.ResponseWriter, r *http.Request, txid string, vout uint32) {
 	var req models.ValidateRequest
 	if !parse(w, r, &req) {
 		return
 	}
-	if !checkID(w, req.ID, id) {
+	if !checkID(w, txid, vout, req.TxID, req.Vout) {
 		return
 	}
 	resp, err := s.Receiver.Validate(req)
 	respond(w, r, resp, err)
 }
 
-func rpcSendHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+func rpcSendHandler(s *ServerState, w http.ResponseWriter, r *http.Request, txid string, vout uint32) {
 	var req models.SendRequest
 	if !parse(w, r, &req) {
 		return
 	}
-	if !checkID(w, req.ID, id) {
+	if !checkID(w, txid, vout, req.TxID, req.Vout) {
 		return
 	}
 	resp, err := s.Receiver.Send(req)
 	respond(w, r, resp, err)
 }
 
-func rpcCloseHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+func rpcCloseHandler(s *ServerState, w http.ResponseWriter, r *http.Request, txid string, vout uint32) {
 	var req models.CloseRequest
 	if !parse(w, r, &req) {
 		return
 	}
-	if !checkID(w, req.ID, id) {
+	if !checkID(w, txid, vout, req.TxID, req.Vout) {
 		return
 	}
 	resp, err := s.Receiver.Close(req)
 	respond(w, r, resp, err)
 }
 
-func rpcStatusHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id string) {
+func rpcStatusHandler(s *ServerState, w http.ResponseWriter, r *http.Request, txid string, vout uint32) {
 	var req models.StatusRequest
 	if !parse(w, r, &req) {
 		return
 	}
-	if !checkID(w, req.ID, id) {
+	if !checkID(w, txid, vout, req.TxID, req.Vout) {
 		return
 	}
 	resp, err := s.Receiver.Status(req)
@@ -125,13 +160,11 @@ func rpcStatusHandler(s *ServerState, w http.ResponseWriter, r *http.Request, id
 const rpcPath = "/moonbeamrpc"
 
 func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-
 	if *debugServerRPC {
-		log.Printf("%s %s", r.Method, path)
+		log.Printf("%s %s", r.Method, r.URL.Path)
 	}
 
-	if path == rpcPath {
+	if r.URL.Path == rpcPath+"/create" {
 		if r.Method == http.MethodPost {
 			rpcCreateHandler(s, w, r)
 			return
@@ -140,24 +173,33 @@ func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := strings.TrimPrefix(path, rpcPath+"/")
+	path := strings.TrimPrefix(r.URL.Path, rpcPath+"/")
 
-	if !models.ValidateChannelID(id) {
+	i := strings.Index(path, "/")
+	if i < 0 {
+		http.NotFound(w, r)
+		return
+	}
+	log.Printf("%s\t%s\t%s", path, path[:i], path[i+1:])
+	call := path[:i]
+	txid, vout, ok := splitTxIDVout(path[i+1:])
+	if !ok {
+		log.Printf("!ok")
 		http.Error(w, "Invalid channel ID", http.StatusNotFound)
 		return
 	}
 
-	switch r.Method {
-	case http.MethodPatch:
-		rpcOpenHandler(s, w, r, id)
-	case http.MethodPut:
-		rpcValidateHandler(s, w, r, id)
-	case http.MethodPost:
-		rpcSendHandler(s, w, r, id)
-	case http.MethodDelete:
-		rpcCloseHandler(s, w, r, id)
-	case http.MethodGet:
-		rpcStatusHandler(s, w, r, id)
+	switch call {
+	case "open":
+		rpcOpenHandler(s, w, r, txid, vout)
+	case "validate":
+		rpcValidateHandler(s, w, r, txid, vout)
+	case "send":
+		rpcSendHandler(s, w, r, txid, vout)
+	case "close":
+		rpcCloseHandler(s, w, r, txid, vout)
+	case "status":
+		rpcStatusHandler(s, w, r, txid, vout)
 	default:
 		http.Error(w, "", http.StatusMethodNotAllowed)
 	}

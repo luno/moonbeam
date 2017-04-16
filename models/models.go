@@ -1,9 +1,5 @@
 package models
 
-import (
-	"encoding/base64"
-)
-
 type CreateRequest struct {
 	Version int    `json:"version"`
 	Net     string `json:"net"`
@@ -13,8 +9,6 @@ type CreateRequest struct {
 }
 
 type CreateResponse struct {
-	ID string `json:"id"`
-
 	Version int    `json:"version"`
 	Net     string `json:"net"`
 	Timeout int64  `json:"timeout"`
@@ -24,10 +18,23 @@ type CreateResponse struct {
 	ReceiverOutput string `json:"receiverOutput"`
 
 	FundingAddress string `json:"fundingAddress"`
+
+	ReceiverData []byte `json:"receiverData"`
 }
 
 type OpenRequest struct {
-	ID string `json:"id"`
+	ReceiverData []byte `json:"receiverData"`
+
+	Version int    `json:"version"`
+	Net     string `json:"net"`
+	Timeout int64  `json:"timeout"`
+	Fee     int64  `json:"fee"`
+
+	SenderPubKey []byte `json:"senderPubKey"`
+	SenderOutput string `json:"senderOutput"`
+
+	ReceiverPubKey []byte `json:"receiverPubKey"`
+	ReceiverOutput string `json:"receiverOutput"`
 
 	TxID string `json:"txid"`
 	Vout uint32 `json:"vout"`
@@ -36,6 +43,7 @@ type OpenRequest struct {
 }
 
 type OpenResponse struct {
+	AuthToken string `json:"authToken"`
 }
 
 type Payment struct {
@@ -44,7 +52,8 @@ type Payment struct {
 }
 
 type ValidateRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 
 	Payment []byte `json:"payment"`
 }
@@ -54,7 +63,8 @@ type ValidateResponse struct {
 }
 
 type SendRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 
 	Payment []byte `json:"payment"`
 
@@ -65,7 +75,8 @@ type SendResponse struct {
 }
 
 type CloseRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 }
 
 type CloseResponse struct {
@@ -73,19 +84,12 @@ type CloseResponse struct {
 }
 
 type StatusRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 }
 
 type StatusResponse struct {
 	Status       int    `json:"status"`
 	Balance      int64  `json:"balance"`
 	PaymentsHash []byte `json:"paymentsHash"`
-}
-
-func ValidateChannelID(s string) bool {
-	if len(s) == 0 || len(s) > 64 {
-		return false
-	}
-	_, err := base64.RawURLEncoding.DecodeString(s)
-	return err == nil
 }

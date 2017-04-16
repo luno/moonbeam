@@ -45,11 +45,11 @@ func setUpChannel(t *testing.T, capacity int64) (*Sender, *Receiver) {
 		t.Fatal(err)
 	}
 
-	r, err := NewReceiver(DefaultReceiverConfig, receiverWIF.PrivKey)
+	r, err := NewReceiver(DefaultReceiverConfig, addr2, receiverWIF.PrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	createResp, err := r.Create(addr2, createReq)
+	createResp, err := r.Create(createReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func setUpChannel(t *testing.T, capacity int64) (*Sender, *Receiver) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	openResp, err := r.Open(capacity, openReq)
+	openResp, err := r.Open(capacity, createResp.FundingAddress, openReq)
 	if err != nil {
 		t.Fatal(err)
 	}

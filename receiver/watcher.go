@@ -27,7 +27,10 @@ func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {
 
 	log.Printf("Closing channel %s due to nearing timeout", rec.ID)
 
-	req := models.CloseRequest{ID: rec.ID}
+	req := models.CloseRequest{
+		TxID: s.FundingTxID,
+		Vout: s.FundingVout,
+	}
 	_, err := r.Close(req)
 	return err
 }

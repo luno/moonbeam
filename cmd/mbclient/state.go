@@ -15,10 +15,10 @@ import (
 )
 
 type Channel struct {
-	Domain   string
-	Host     string
-	KeyPath  int
-	RemoteID string
+	Domain       string
+	Host         string
+	KeyPath      int
+	ReceiverData []byte
 
 	PendingPayment []byte
 
@@ -174,13 +174,4 @@ func findForDomain(domain string) []string {
 		}
 	}
 	return ids
-}
-
-func hasRemoteID(domain, remoteID string) bool {
-	for _, c := range globalState.Channels {
-		if c.Domain == domain && c.RemoteID == remoteID {
-			return true
-		}
-	}
-	return false
 }

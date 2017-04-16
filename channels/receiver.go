@@ -31,7 +31,7 @@ type Receiver struct {
 	State   SharedState
 }
 
-func NewReceiver(c ReceiverConfig, privKey *btcec.PrivateKey) (*Receiver, error) {
+func NewReceiver(c ReceiverConfig, receiverOutput string, privKey *btcec.PrivateKey) (*Receiver, error) {
 	state := SharedState{
 		Net:    c.Net,
 		Status: StatusCreated,
@@ -49,6 +49,11 @@ func NewReceiver(c ReceiverConfig, privKey *btcec.PrivateKey) (*Receiver, error)
 		return nil, err
 	}
 	state.ReceiverPubKey = pubKey.PubKey().SerializeCompressed()
+
+	if err := checkSupportedAddress(net, receiverOutput); err != nil {
+		return nil, errors.New("invalid receiverOutput")
+	}
+	state.ReceiverOutput = receiverOutput
 
 	return &Receiver{
 		config:  c,
@@ -92,12 +97,9 @@ func LoadReceiver(c ReceiverConfig, state SharedState, privKey *btcec.PrivateKey
 	}, nil
 }
 
-func (r *Receiver) Create(receiverOutput string, req *models.CreateRequest) (*models.CreateResponse, error) {
+func (r *Receiver) Create(req *models.CreateRequest) (*models.CreateResponse, error) {
 	if r.State.Status != StatusCreated {
 		return nil, ErrNotStatusCreated
-	}
-	if err := checkSupportedAddress(r.net, receiverOutput); err != nil {
-		return nil, errors.New("invalid receiverOutput")
 	}
 
 	if req.Version != Version {
@@ -117,7 +119,6 @@ func (r *Receiver) Create(receiverOutput string, req *models.CreateRequest) (*mo
 	s.Version = Version
 	s.Timeout = r.config.Timeout
 	s.Fee = r.config.FeeRate * typicalCloseTxSize
-	s.ReceiverOutput = receiverOutput
 	s.SenderOutput = req.SenderOutput
 	s.SenderPubKey = req.SenderPubKey
 
@@ -126,21 +127,22 @@ func (r *Receiver) Create(receiverOutput string, req *models.CreateRequest) (*mo
 		return nil, err
 	}
 
-	r.State = s
+	//r.State = s
 
 	return &models.CreateResponse{
-		Version:        r.State.Version,
-		Net:            r.State.Net,
-		Timeout:        r.State.Timeout,
-		Fee:            r.State.Fee,
-		ReceiverPubKey: r.State.ReceiverPubKey,
-		ReceiverOutput: r.State.ReceiverOutput,
+		Version:        s.Version,
+		Net:            s.Net,
+		Timeout:        s.Timeout,
+		Fee:            s.Fee,
+		ReceiverPubKey: s.ReceiverPubKey,
+		ReceiverOutput: s.ReceiverOutput,
 		FundingAddress: fundingAddr,
 	}, nil
 }
 
 // TODO: add nconf param and validate according to config
-func (r *Receiver) Open(amount int64, req *models.OpenRequest) (*models.OpenResponse, error) {
+// TODO: pkscript instead of address
+func (r *Receiver) Open(amount int64, address string, req *models.OpenRequest) (*models.OpenResponse, error) {
 	if r.State.Status != StatusCreated {
 		return nil, ErrNotStatusCreated
 	}
@@ -154,16 +156,52 @@ func (r *Receiver) Open(amount int64, req *models.OpenRequest) (*models.OpenResp
 	if len(req.SenderSig) == 0 {
 		return nil, errors.New("missing senderSig")
 	}
+	if req.Net != r.config.Net {
+		return nil, errors.New("wrong net")
+	}
+	if !bytes.Equal(req.ReceiverPubKey, r.State.ReceiverPubKey) {
+		return nil, errors.New("wrong receiverPubKey")
+	}
+	if req.ReceiverOutput != r.State.ReceiverOutput {
+		return nil, errors.New("wrong receiverOutput")
+	}
 
-	s := r.State
-	s.Status = StatusOpen
-	s.FundingTxID = req.TxID
-	s.FundingVout = req.Vout
-	s.Capacity = amount
-	s.SenderSig = req.SenderSig
+	s := SharedState{
+		Version:        req.Version,
+		Net:            req.Net,
+		Timeout:        req.Timeout,
+		Fee:            req.Fee,
+		Status:         StatusOpen,
+		SenderPubKey:   req.SenderPubKey,
+		ReceiverPubKey: req.ReceiverPubKey,
+		SenderOutput:   req.SenderOutput,
+		ReceiverOutput: req.ReceiverOutput,
+		FundingTxID:    req.TxID,
+		FundingVout:    req.Vout,
+		Capacity:       amount,
+		SenderSig:      req.SenderSig,
+	}
+
+	_, fundingAddr, err := s.GetFundingScript()
+	if err != nil {
+		return nil, err
+	}
+	if fundingAddr != address {
+		return nil, errors.New("mismatched funding address")
+	}
 
 	if err := validateSenderSig(s, r.privKey); err != nil {
 		return nil, err
+	}
+
+	minFee := r.config.FeeRate * typicalCloseTxSize
+
+	acceptable := s.Version == Version &&
+		s.Timeout >= r.config.Timeout &&
+		s.Fee >= minFee
+
+	if !acceptable {
+		r.State.Status = StatusClosing
 	}
 
 	r.State = s

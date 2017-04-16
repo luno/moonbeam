@@ -277,17 +277,22 @@ The maximum acceptable serialized payment is 2^16 - 1 = 65535 bytes.
 
 ## RPC Protocol
 
-The channel is manipulated via HTTP requests from the client to the server. The requests are sent to the endpoint URL or endpoint/channel_id if they relate to a specific channel. The request and response bodies are JSON. HTTP 200 is returned on success. A non-200 response is returned on failure.
+The channel is manipulated via HTTP requests from the client to the server. The requests are sent to routes rooted at the endpoint URL. The request and response bodies are JSON. HTTP 200 is returned on success. A non-200 response is returned on failure.
+
+The operations and channel IDs are encoded into the URLs so that servers may
+apply some filtering and rate limiting based on the URLs alone.
 
 ### Channel IDs
 
-A channel ID consists of 1 to 64 characters from the set of [a-z], [A-Z], [0-9], hyphen (-) and underscore (_). This is the same character range as used by the “URL-safe” base64 variant.
+A channel is uniquely identified by its funding outpoint
+(*fundingTxID*, *fundingVout*). A channel id consists of the string
+*fundingTxID*-*fundingVout*.
 
 ### Create
 
 Initiate a channel opening. This creates a channel in the CREATED state.
 
-`POST <endpoint>`
+`POST <endpoint>/create`
 
 ```go
 type CreateRequest struct {
@@ -299,8 +304,6 @@ type CreateRequest struct {
 }
 
 type CreateResponse struct {
-	ID string `json:"id"`
-
 	Version int    `json:"version"`
 	Net     string `json:"net"`
 	Timeout int64  `json:"timeout"`
@@ -310,6 +313,8 @@ type CreateResponse struct {
 	ReceiverOutput string `json:"receiverOutput"`
 
 	FundingAddress string `json:"fundingAddress"`
+
+        ReceiverData []byte `json:"receiverData"`
 }
 ```
 
@@ -317,11 +322,22 @@ type CreateResponse struct {
 
 After the funding transaction has been mined, this moves the channel to the OPEN state.
 
-`PATCH <endpoint>/<channel_id>`
+`PUT <endpoint>/open/<txid>-<vout>`
 
 ```go
 type OpenRequest struct {
-	ID string `json:"id"`
+        ReceiverData []byte `json:"receiverData"`
+
+        Version int    `json:"version"`
+	Net     string `json:"net"`
+	Timeout int64  `json:"timeout"`
+	Fee     int64  `json:"fee"`
+
+	SenderPubKey []byte `json:"senderPubKey"`
+	SenderOutput string `json:"senderOutput"`
+
+        ReceiverPubKey []byte `json:"receiverPubKey"`
+	ReceiverOutput string `json:"receiverOutput"`
 
 	TxID string `json:"txid"`
 	Vout uint32 `json:"vout"`
@@ -330,6 +346,7 @@ type OpenRequest struct {
 }
 
 type OpenResponse struct {
+	AuthToken string `json:"authToken"`
 }
 ```
 
@@ -337,13 +354,17 @@ type OpenResponse struct {
 
 Validate checks whether a payment would be accepted if it is sent.
 
-`PATCH <endpoint>/<channel_id>`
+```
+PUT <endpoint>/validate/<txid>-<vout>
+Authorization: Bearer <authToken>
+```
 
 ```go
 type ValidateRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 
-	Payment []byte `json:"payment"`
+        Payment []byte `json:"payment"`
 }
 
 type ValidateResponse struct {
@@ -355,11 +376,15 @@ type ValidateResponse struct {
 
 Send a payment and update the channel balance.
 
-`POST <endpoint>/<channel_id>`
+```
+POST <endpoint>/send/<txid>-<vout>
+Authorization: Bearer <authToken>
+```
 
 ```go
 type SendRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 
 	Payment []byte `json:"payment"`
 
@@ -376,11 +401,15 @@ Note: The sender shouldn’t rely on any error returned. See a later section for
 
 Request the server to close the connection.
 
-`DELETE <endpoint>/<channel_id>`
+```
+DELETE <endpoint>/close/<txid>-<vout>
+Authorization: Bearer <authToken>
+```
 
 ```go
 type CloseRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 }
 
 type CloseResponse struct {
@@ -392,11 +421,15 @@ type CloseResponse struct {
 
 Get the channel status and balance.
 
-`GET <endpoint>/<channel_id>`
+```
+GET <endpoint>/status/<txid>-<vout>
+Authorization: Bearer <authToken>
+```
 
 ```go
 type StatusRequest struct {
-	ID string `json:"id"`
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
 }
 
 type StatusResponse struct {
@@ -586,6 +619,10 @@ channel is open that could disrupt the final closure. For example, a blockchain
 fork could render the closure transaction invalid, or changes to mempool
 acceptance rules could disrupt closure transactions.
 
+**Denial of service**
+The server must expose its endpoint to the public. Therefore, it can be a target
+of DDOS attacks. This may be mitigated by filtering, rate limiting and providing
+multiple endpoints in moonbeam.json.
 
 ## Recommended parameters
 

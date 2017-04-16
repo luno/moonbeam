@@ -7,7 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"strconv"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -53,7 +56,8 @@ func NewReceiver(net *chaincfg.Params,
 	}
 }
 
-func (r *Receiver) Get(id string) *channels.SharedState {
+func (r *Receiver) Get(txid string, vout uint32) *channels.SharedState {
+	id := getChannelID(txid, vout)
 	rec, err := r.db.Get(id)
 	if err != nil {
 		return nil
@@ -68,8 +72,9 @@ func (r *Receiver) List() ([]storage.Record, error) {
 	return r.db.List()
 }
 
-func (r *Receiver) ListPayments(channelID string) ([][]byte, error) {
-	return r.db.ListPayments(channelID)
+func (r *Receiver) ListPayments(txid string, vout uint32) ([][]byte, error) {
+	id := getChannelID(txid, vout)
+	return r.db.ListPayments(id)
 }
 
 func (r *Receiver) getKey(n int) (*btcec.PrivateKey, error) {
@@ -87,6 +92,10 @@ func genChannelID() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func getChannelID(txid string, vout uint32) string {
+	return fmt.Sprintf("%s-%d", strings.ToLower(txid), vout)
 }
 
 func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, error) {
@@ -111,65 +120,48 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	c, err := channels.NewReceiver(r.config, privKey)
+	c, err := channels.NewReceiver(r.config, r.receiverOutput, privKey)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.Create(r.receiverOutput, &req)
+	resp, err := c.Create(&req)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := genChannelID()
-	if err != nil {
-		return nil, err
-	}
-	resp.ID = id
-
-	rec := storage.Record{
-		ID:          id,
-		KeyPath:     n,
-		SharedState: c.State,
-	}
-
-	if err := r.db.Create(rec); err != nil {
-		return nil, err
-	}
+	resp.ReceiverData = []byte(strconv.Itoa(n))
 
 	return resp, nil
 }
 
-func getTxOut(bc *btcrpcclient.Client,
-	txid string, vout uint32, addr string) (int64, int, string, error) {
+func getTxOut(bc *btcrpcclient.Client, txid string, vout uint32) (int64, string, int, string, error) {
 
 	txhash, err := chainhash.NewHashFromStr(txid)
 	if err != nil {
-		return 0, 0, "", err
+		return 0, "", 0, "", err
 	}
 
 	txout, err := bc.GetTxOut(txhash, vout, false)
 	if err != nil {
-		return 0, 0, "", err
+		return 0, "", 0, "", err
 	}
 	if txout == nil {
-		return 0, 0, "", errors.New("cannot find utxo")
+		return 0, "", 0, "", errors.New("cannot find utxo")
 	}
 
 	if txout.Coinbase {
-		return 0, 0, "", errors.New("cannot use coinbase")
+		return 0, "", 0, "", errors.New("cannot use coinbase")
 	}
 
 	if len(txout.ScriptPubKey.Addresses) != 1 {
-		return 0, 0, "", errors.New("wrong number of addresses")
+		return 0, "", 0, "", errors.New("wrong number of addresses")
 	}
-	if txout.ScriptPubKey.Addresses[0] != addr {
-		return 0, 0, "", errors.New("bad address")
-	}
+	addr := txout.ScriptPubKey.Addresses[0]
 
 	// yuck
 	value := int64(txout.Value * 1e8)
 
-	return value, int(txout.Confirmations), txout.BestBlock, nil
+	return value, addr, int(txout.Confirmations), txout.BestBlock, nil
 }
 
 func getHeight(bc *btcrpcclient.Client, blockhash string) (int64, error) {
@@ -208,18 +200,24 @@ func (r *Receiver) getPolicy() policy {
 }
 
 func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
-	c, err := r.get(req.ID)
-	if err != nil {
-		return nil, err
-	}
-	prevState := c.State
+	//c, err := r.get(req.ID)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//prevState := c.State
 
-	_, addr, err := c.State.GetFundingScript()
+	//_, addr, err := c.State.GetFundingScript()
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	// TODO: sign receiverData with expiry
+	keyPath, err := strconv.Atoi(string(req.ReceiverData))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("invalid receiverData")
 	}
 
-	amount, conf, blockHash, err := getTxOut(r.bc, req.TxID, req.Vout, addr)
+	amount, addr, conf, blockHash, err := getTxOut(r.bc, req.TxID, req.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +234,17 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	resp, err := c.Open(amount, &req)
+	privKey, err := r.getKey(keyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := channels.NewReceiver(r.config, r.receiverOutput, privKey)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.Open(amount, addr, &req)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +252,15 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	newState := c.State
 	newState.BlockHeight = int(height)
 
-	if err := r.db.Update(req.ID, prevState, newState, nil); err != nil {
+	id := getChannelID(req.TxID, req.Vout)
+
+	rec := storage.Record{
+		ID:          id,
+		KeyPath:     keyPath,
+		SharedState: newState,
+	}
+
+	if err := r.db.Create(rec); err != nil {
 		return nil, err
 	}
 
@@ -276,7 +292,8 @@ func (r *Receiver) validate(c *channels.Receiver, payment []byte) (bool, *models
 }
 
 func (r *Receiver) Validate(req models.ValidateRequest) (*models.ValidateResponse, error) {
-	c, err := r.get(req.ID)
+	id := getChannelID(req.TxID, req.Vout)
+	c, err := r.get(id)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +307,8 @@ func (r *Receiver) Validate(req models.ValidateRequest) (*models.ValidateRespons
 }
 
 func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
-	c, err := r.get(req.ID)
+	id := getChannelID(req.TxID, req.Vout)
+	c, err := r.get(id)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +329,7 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 
 	newState := c.State
 
-	if err := r.db.Update(req.ID, prevState, newState, req.Payment); err != nil {
+	if err := r.db.Update(id, prevState, newState, req.Payment); err != nil {
 		return nil, err
 	}
 
@@ -319,7 +337,8 @@ func (r *Receiver) Send(req models.SendRequest) (*models.SendResponse, error) {
 }
 
 func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error) {
-	c, err := r.get(req.ID)
+	id := getChannelID(req.TxID, req.Vout)
+	c, err := r.get(id)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +353,7 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 
 	newState := c.State
 
-	if err := r.db.Update(req.ID, prevState, newState, nil); err != nil {
+	if err := r.db.Update(id, prevState, newState, nil); err != nil {
 		return nil, err
 	}
 
@@ -354,7 +373,8 @@ func (r *Receiver) Close(req models.CloseRequest) (*models.CloseResponse, error)
 }
 
 func (r *Receiver) Status(req models.StatusRequest) (*models.StatusResponse, error) {
-	c, err := r.get(req.ID)
+	id := getChannelID(req.TxID, req.Vout)
+	c, err := r.get(id)
 	if err != nil {
 		return nil, err
 	}

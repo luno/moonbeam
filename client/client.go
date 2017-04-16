@@ -32,14 +32,8 @@ func NewClient(c *http.Client, endpoint string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) do(method, id string, req, resp interface{}) error {
-	url := c.endpoint
-	if id != "" {
-		if !models.ValidateChannelID(id) {
-			return errors.New("invalid channel ID")
-		}
-		url += "/" + id
-	}
+func (c *Client) do(method, path string, req, resp interface{}) error {
+	url := c.endpoint + path
 
 	buf, err := json.Marshal(req)
 	if err != nil {
@@ -80,47 +74,56 @@ func (c *Client) do(method, id string, req, resp interface{}) error {
 
 func (c *Client) Create(req models.CreateRequest) (*models.CreateResponse, error) {
 	var resp models.CreateResponse
-	if err := c.do(http.MethodPost, "", req, &resp); err != nil {
+	if err := c.do(http.MethodPost, "/create", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
+func getChannelID(txid string, vout uint32) string {
+	return fmt.Sprintf("%s-%d", txid, vout)
+}
+
 func (c *Client) Open(req models.OpenRequest) (*models.OpenResponse, error) {
+	path := "/open/" + getChannelID(req.TxID, req.Vout)
 	var resp models.OpenResponse
-	if err := c.do(http.MethodPatch, req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodPut, path, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 func (c *Client) Validate(req models.ValidateRequest) (*models.ValidateResponse, error) {
+	path := "/validate/" + getChannelID(req.TxID, req.Vout)
 	var resp models.ValidateResponse
-	if err := c.do(http.MethodPut, req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodPut, path, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 func (c *Client) Send(req models.SendRequest) (*models.SendResponse, error) {
+	path := "/send/" + getChannelID(req.TxID, req.Vout)
 	var resp models.SendResponse
-	if err := c.do(http.MethodPost, req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodPost, path, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 func (c *Client) Close(req models.CloseRequest) (*models.CloseResponse, error) {
+	path := "/close/" + getChannelID(req.TxID, req.Vout)
 	var resp models.CloseResponse
-	if err := c.do(http.MethodDelete, req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodDelete, path, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 func (c *Client) Status(req models.StatusRequest) (*models.StatusResponse, error) {
+	path := "/status/" + getChannelID(req.TxID, req.Vout)
 	var resp models.StatusResponse
-	if err := c.do(http.MethodGet, req.ID, req, &resp); err != nil {
+	if err := c.do(http.MethodGet, path, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

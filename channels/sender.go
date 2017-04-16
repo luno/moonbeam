@@ -128,9 +128,6 @@ func (s *Sender) GotCreateResponse(resp *models.CreateResponse) error {
 		return errors.New("senderOutput is missing")
 	}
 
-	if !models.ValidateChannelID(resp.ID) {
-		return errors.New("invalid channel ID")
-	}
 	if resp.Version != Version {
 		return errors.New("unsupported version")
 	}
@@ -212,6 +209,17 @@ func (s *Sender) GetOpenRequest(txid string, vout uint32, amount int64) (*models
 	}
 
 	return &models.OpenRequest{
+		Version: s.State.Version,
+		Net:     s.State.Net,
+		Timeout: s.State.Timeout,
+		Fee:     s.State.Fee,
+
+		SenderPubKey: s.State.SenderPubKey,
+		SenderOutput: s.State.SenderOutput,
+
+		ReceiverPubKey: s.State.ReceiverPubKey,
+		ReceiverOutput: s.State.ReceiverOutput,
+
 		TxID:      txid,
 		Vout:      vout,
 		SenderSig: sig,
@@ -251,6 +259,8 @@ func (s *Sender) GetSendRequest(amount int64, payment []byte) (*models.SendReque
 	}
 
 	return &models.SendRequest{
+		TxID:      s.State.FundingTxID,
+		Vout:      s.State.FundingVout,
 		Payment:   payment,
 		SenderSig: sig,
 	}, nil
@@ -275,7 +285,10 @@ func (s *Sender) GetCloseRequest() (*models.CloseRequest, error) {
 		return nil, ErrNotStatusOpen
 	}
 	s.State.Status = StatusClosing
-	return &models.CloseRequest{}, nil
+	return &models.CloseRequest{
+		TxID: s.State.FundingTxID,
+		Vout: s.State.FundingVout,
+	}, nil
 }
 
 func (s *Sender) GotCloseResponse(resp *models.CloseResponse) error {

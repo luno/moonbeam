@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -169,14 +170,19 @@ None
 </html>`))
 
 func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
-	s := ss.Receiver.Get(id)
+	txid, vout, ok := splitTxIDVout(r.FormValue("id"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	s := ss.Receiver.Get(txid, vout)
 	if s == nil {
 		http.NotFound(w, r)
 		return
 	}
 
-	payments, err := ss.Receiver.ListPayments(id)
+	payments, err := ss.Receiver.ListPayments(txid, vout)
 	if err != nil {
 		log.Printf("error: %v", err)
 		http.Error(w, "error", http.StatusInternalServerError)
@@ -197,14 +203,21 @@ func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 		ID        string
 		StateJSON string
 		Payments  []string
-	}{id, string(buf), pl}
+	}{fmt.Sprintf("%s-%d", txid, vout), string(buf), pl}
 	render(detailsT, w, c)
 }
 
 func closeHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
+	txid, vout, ok := splitTxIDVout(r.FormValue("id"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
 
-	req := models.CloseRequest{ID: id}
+	req := models.CloseRequest{
+		TxID: txid,
+		Vout: vout,
+	}
 
 	resp, err := ss.Receiver.Close(req)
 	if err != nil {

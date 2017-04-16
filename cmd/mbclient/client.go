@@ -140,24 +140,20 @@ func create(args []string) error {
 		return err
 	}
 
-	fmt.Printf("Funding address: %s\n", addr)
-
 	// Sanity check to make sure client and server both agree on the state.
 	if addr != resp.FundingAddress {
 		return errors.New("state discrepancy")
 	}
 
-	if hasRemoteID(domain, resp.ID) {
-		return errors.New("reused channel id")
-	}
+	fmt.Printf("Funding address: %s\n", addr)
 
 	id := strconv.Itoa(n)
 	globalState.Channels[id] = Channel{
-		Domain:   domain,
-		Host:     host,
-		State:    s.State,
-		KeyPath:  n,
-		RemoteID: resp.ID,
+		Domain:       domain,
+		Host:         host,
+		State:        s.State,
+		KeyPath:      n,
+		ReceiverData: resp.ReceiverData,
 	}
 
 	fmt.Printf("%s\n", id)
@@ -186,7 +182,7 @@ func fund(args []string) error {
 	if err != nil {
 		return err
 	}
-	req.ID = ch.RemoteID
+	req.ReceiverData = ch.ReceiverData
 
 	c, err := getClient(id)
 	if err != nil {
@@ -254,7 +250,8 @@ func send(args []string) error {
 		return err
 	}
 	req := models.ValidateRequest{
-		ID:      ch.RemoteID,
+		TxID:    ch.State.FundingTxID,
+		Vout:    ch.State.FundingVout,
 		Payment: payment,
 	}
 	resp, err := c.Validate(req)
@@ -296,7 +293,7 @@ func flush(id string) error {
 	if err != nil {
 		return err
 	}
-	sendReq.ID = ch.RemoteID
+	//sendReq.ID = ch.RemoteID
 
 	// Either the payment has been sent or it hasn't. Find out which one.
 
@@ -305,7 +302,8 @@ func flush(id string) error {
 		return err
 	}
 	req := models.StatusRequest{
-		ID: ch.RemoteID,
+		TxID: ch.State.FundingTxID,
+		Vout: ch.State.FundingVout,
 	}
 	resp, err := c.Status(req)
 	if err != nil {
@@ -348,7 +346,7 @@ func flushAction(args []string) error {
 func closeAction(args []string) error {
 	id := args[0]
 
-	ch, sender, err := getChannel(id)
+	_, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -357,7 +355,6 @@ func closeAction(args []string) error {
 	if err != nil {
 		return err
 	}
-	req.ID = ch.RemoteID
 
 	c, err := getClient(id)
 	if err != nil {
@@ -394,7 +391,8 @@ func status(args []string) error {
 		return err
 	}
 	req := models.StatusRequest{
-		ID: ch.RemoteID,
+		TxID: ch.State.FundingTxID,
+		Vout: ch.State.FundingVout,
 	}
 	resp, err := c.Status(req)
 	if err != nil {
