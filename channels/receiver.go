@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
 	"bitbucket.org/bitx/moonchan/models"
@@ -141,13 +142,12 @@ func (r *Receiver) Create(req *models.CreateRequest) (*models.CreateResponse, er
 }
 
 // TODO: add nconf param and validate according to config
-// TODO: pkscript instead of address
-func (r *Receiver) Open(amount int64, address string, req *models.OpenRequest) (*models.OpenResponse, error) {
+func (r *Receiver) Open(txout *wire.TxOut, req *models.OpenRequest) (*models.OpenResponse, error) {
 	if r.State.Status != StatusCreated {
 		return nil, ErrNotStatusCreated
 	}
 
-	if amount <= 0 {
+	if txout.Value <= 0 {
 		return nil, errors.New("invalid amount")
 	}
 	if _, err := chainhash.NewHashFromStr(req.TxID); err != nil {
@@ -178,15 +178,20 @@ func (r *Receiver) Open(amount int64, address string, req *models.OpenRequest) (
 		ReceiverOutput: req.ReceiverOutput,
 		FundingTxID:    req.TxID,
 		FundingVout:    req.Vout,
-		Capacity:       amount,
+		Capacity:       txout.Value,
 		SenderSig:      req.SenderSig,
 	}
 
-	_, fundingAddr, err := s.GetFundingScript()
+	// Make sure txout.PkScript matches the funding address.
+	script, _, err := s.GetFundingScript()
 	if err != nil {
 		return nil, err
 	}
-	if fundingAddr != address {
+	expected, err := btcutil.NewAddressScriptHash(script, r.net)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(txout.PkScript, expected.ScriptAddress()) {
 		return nil, errors.New("mismatched funding address")
 	}
 

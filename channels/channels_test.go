@@ -1,9 +1,11 @@
 package channels
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
 	"bitbucket.org/bitx/moonchan/models"
@@ -58,15 +60,18 @@ func setUpChannel(t *testing.T, capacity int64) (*Sender, *Receiver) {
 	}
 
 	const (
-		txid = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
-		vout = 1
+		txid        = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
+		vout        = 1
+		pkscriptHex = "fbe9351367de8e1e341ad62312f107b839bddb0a"
 	)
+	pkscript, _ := hex.DecodeString(pkscriptHex)
+	txout := wire.NewTxOut(capacity, pkscript)
 
 	openReq, err := s.GetOpenRequest(txid, vout, capacity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	openResp, err := r.Open(capacity, createResp.FundingAddress, openReq)
+	openResp, err := r.Open(txout, openReq)
 	if err != nil {
 		t.Fatal(err)
 	}

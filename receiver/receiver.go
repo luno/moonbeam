@@ -145,34 +145,36 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 	return resp, nil
 }
 
-func getTxOut(bc *btcrpcclient.Client, txid string, vout uint32) (int64, string, int, string, error) {
+func getTxOut(bc *btcrpcclient.Client, txid string, vout uint32) (*wire.TxOut, int, string, error) {
 
 	txhash, err := chainhash.NewHashFromStr(txid)
 	if err != nil {
-		return 0, "", 0, "", err
+		return nil, 0, "", err
 	}
 
 	txout, err := bc.GetTxOut(txhash, vout, false)
 	if err != nil {
-		return 0, "", 0, "", err
+		return nil, 0, "", err
 	}
 	if txout == nil {
-		return 0, "", 0, "", errors.New("cannot find utxo")
+		return nil, 0, "", errors.New("cannot find utxo")
 	}
 
 	if txout.Coinbase {
-		return 0, "", 0, "", errors.New("cannot use coinbase")
+		return nil, 0, "", errors.New("cannot use coinbase")
 	}
 
-	if len(txout.ScriptPubKey.Addresses) != 1 {
-		return 0, "", 0, "", errors.New("wrong number of addresses")
+	pkscript, err := hex.DecodeString(txout.ScriptPubKey.Hex)
+	if err != nil {
+		return nil, 0, "", err
 	}
-	addr := txout.ScriptPubKey.Addresses[0]
 
 	// yuck
 	value := int64(txout.Value * 1e8)
 
-	return value, addr, int(txout.Confirmations), txout.BestBlock, nil
+	wtxout := wire.NewTxOut(value, pkscript)
+
+	return wtxout, int(txout.Confirmations), txout.BestBlock, nil
 }
 
 func getHeight(bc *btcrpcclient.Client, blockhash string) (int64, error) {
@@ -215,7 +217,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, errors.New("invalid receiverData")
 	}
 
-	amount, addr, conf, blockHash, err := getTxOut(r.bc, req.TxID, req.Vout)
+	txout, conf, blockHash, err := getTxOut(r.bc, req.TxID, req.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +245,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
-	resp, err := c.Open(amount, addr, &req)
+	resp, err := c.Open(txout, &req)
 	if err != nil {
 		return nil, err
 	}
