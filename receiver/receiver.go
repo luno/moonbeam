@@ -19,7 +19,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
 	"bitbucket.org/bitx/moonchan/channels"
@@ -124,23 +123,10 @@ func getChannelID(txid string, vout uint32) string {
 }
 
 func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, error) {
-	// channels.Receiver.Create would validate these fields, but we do it
-	// here anyway because we have to hit the db beforehand.
-	if _, err := btcutil.NewAddressPubKey(req.SenderPubKey, r.Net); err != nil {
-		return nil, err
-	}
-	if req.Version != channels.Version {
-		return nil, errors.New("unsupported version")
-	}
-	if req.Net != r.config.Net {
-		return nil, errors.New("unsupported network")
-	}
-
-	n, err := r.db.ReserveKeyPath()
-	if err != nil {
-		return nil, err
-	}
-	privKey, err := r.getKey(n)
+	// TODO: Periodically rotate privKey by incrementing the child key
+	// counter and return the key index in ReceiverData.
+	const keyPath = 0
+	privKey, err := r.getKey(keyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +140,7 @@ func (r *Receiver) Create(req models.CreateRequest) (*models.CreateResponse, err
 		return nil, err
 	}
 
-	resp.ReceiverData = []byte(strconv.Itoa(n))
+	resp.ReceiverData = []byte(strconv.Itoa(keyPath))
 
 	return resp, nil
 }
@@ -225,9 +211,7 @@ func (r *Receiver) getPolicy() policy {
 }
 
 func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
-	// TODO: sign receiverData with expiry
-	keyPath, err := strconv.Atoi(string(req.ReceiverData))
-	if err != nil {
+	if string(req.ReceiverData) != "0" {
 		return nil, errors.New("invalid receiverData")
 	}
 
@@ -248,6 +232,7 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 		return nil, err
 	}
 
+	const keyPath = 0
 	privKey, err := r.getKey(keyPath)
 	if err != nil {
 		return nil, err
