@@ -74,6 +74,16 @@ func checkID(w http.ResponseWriter, atxid string, avout uint32, btxid string, bv
 	return true
 }
 
+func checkAuthToken(s *ServerState, r *http.Request, txid string, vout uint32) bool {
+	h := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if !strings.HasPrefix(h, prefix) {
+		return false
+	}
+	h = h[len(prefix):]
+	return s.Receiver.ValidateToken(txid, vout, h)
+}
+
 func respond(w http.ResponseWriter, r *http.Request, resp interface{}, err error) {
 	if err != nil {
 		if *debugServerRPC {
@@ -180,18 +190,24 @@ func rpcHandler(s *ServerState, w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	log.Printf("%s\t%s\t%s", path, path[:i], path[i+1:])
 	call := path[:i]
 	txid, vout, ok := splitTxIDVout(path[i+1:])
 	if !ok {
-		log.Printf("!ok")
 		http.Error(w, "Invalid channel ID", http.StatusNotFound)
 		return
 	}
 
-	switch call {
-	case "open":
+	if call == "open" {
 		rpcOpenHandler(s, w, r, txid, vout)
+		return
+	}
+
+	if !checkAuthToken(s, r, txid, vout) {
+		http.Error(w, "invalid auth token", http.StatusUnauthorized)
+		return
+	}
+
+	switch call {
 	case "validate":
 		rpcValidateHandler(s, w, r, txid, vout)
 	case "send":

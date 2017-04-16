@@ -2,7 +2,9 @@ package receiver
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -32,6 +34,7 @@ type Receiver struct {
 	db             storage.Storage
 	dir            *Directory
 	receiverOutput string
+	authKey        []byte
 	config         channels.ReceiverConfig
 }
 
@@ -40,7 +43,8 @@ func NewReceiver(net *chaincfg.Params,
 	bc *btcrpcclient.Client,
 	db storage.Storage,
 	dir *Directory,
-	destination string) *Receiver {
+	destination string,
+	authKey string) *Receiver {
 
 	config := channels.DefaultReceiverConfig
 	config.Net = net.Name
@@ -52,6 +56,7 @@ func NewReceiver(net *chaincfg.Params,
 		db:             db,
 		dir:            dir,
 		receiverOutput: destination,
+		authKey:        []byte(authKey),
 		config:         config,
 	}
 }
@@ -75,6 +80,26 @@ func (r *Receiver) List() ([]storage.Record, error) {
 func (r *Receiver) ListPayments(txid string, vout uint32) ([][]byte, error) {
 	id := getChannelID(txid, vout)
 	return r.db.ListPayments(id)
+}
+
+func (r *Receiver) issue(txid string, vout uint32) []byte {
+	id := getChannelID(txid, vout)
+	mac := hmac.New(sha256.New, r.authKey)
+	mac.Write([]byte(id))
+	return mac.Sum(nil)
+}
+
+func (r *Receiver) issueToken(txid string, vout uint32) string {
+	return base64.StdEncoding.EncodeToString(r.issue(txid, vout))
+}
+
+func (r *Receiver) ValidateToken(txid string, vout uint32, token string) bool {
+	actual, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return false
+	}
+	expected := r.issue(txid, vout)
+	return hmac.Equal(actual, expected)
 }
 
 func (r *Receiver) getKey(n int) (*btcec.PrivateKey, error) {
@@ -200,17 +225,6 @@ func (r *Receiver) getPolicy() policy {
 }
 
 func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
-	//c, err := r.get(req.ID)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//prevState := c.State
-
-	//_, addr, err := c.State.GetFundingScript()
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	// TODO: sign receiverData with expiry
 	keyPath, err := strconv.Atoi(string(req.ReceiverData))
 	if err != nil {
@@ -263,6 +277,8 @@ func (r *Receiver) Open(req models.OpenRequest) (*models.OpenResponse, error) {
 	if err := r.db.Create(rec); err != nil {
 		return nil, err
 	}
+
+	resp.AuthToken = r.issueToken(req.TxID, req.Vout)
 
 	return resp, nil
 }

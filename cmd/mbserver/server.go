@@ -28,6 +28,7 @@ var externalURL = flag.String("external_url", "https://example.com:3211", "Exter
 var domain = flag.String("domain", "example.com", "Domain to accept payments for")
 var tlsCert = flag.String("tls_cert", "tls/cert.pem", "TLS certificate")
 var tlsKey = flag.String("tls_key", "tls/key.pem", "TLS key")
+var authToken = flag.String("auth_token", "38a9cba31aed7e655b8d6d7014efc9bbc8ed9a961b708e90dc05e3b70994c5df", "Secret used to issue auth tokens")
 
 func getnet() *chaincfg.Params {
 	if *testnet {
@@ -99,7 +100,7 @@ func main() {
 	defer bc.Shutdown()
 
 	dir := receiver.NewDirectory(*domain)
-	s := receiver.NewReceiver(net, ek, bc, storage, dir, *destination)
+	s := receiver.NewReceiver(net, ek, bc, storage, dir, *destination, *authToken)
 
 	go s.WatchBlockchainForever()
 

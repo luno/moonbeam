@@ -23,6 +23,9 @@ type CreateResponse struct {
 }
 
 type OpenRequest struct {
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
+
 	ReceiverData []byte `json:"receiverData"`
 
 	Version int    `json:"version"`
@@ -35,9 +38,6 @@ type OpenRequest struct {
 
 	ReceiverPubKey []byte `json:"receiverPubKey"`
 	ReceiverOutput string `json:"receiverOutput"`
-
-	TxID string `json:"txid"`
-	Vout uint32 `json:"vout"`
 
 	SenderSig []byte `json:"senderSig"`
 }

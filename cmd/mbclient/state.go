@@ -19,6 +19,7 @@ type Channel struct {
 	Host         string
 	KeyPath      int
 	ReceiverData []byte
+	AuthToken    string
 
 	PendingPayment []byte
 
@@ -162,6 +163,16 @@ func storePendingPayment(id string, state channels.SharedState, p []byte) error 
 	} else {
 		c.PendingPayment = p
 	}
+	globalState.Channels[id] = c
+	return nil
+}
+
+func storeAuthToken(id string, authToken string) error {
+	c, ok := globalState.Channels[id]
+	if !ok {
+		return errors.New("channel does not exist")
+	}
+	c.AuthToken = authToken
 	globalState.Channels[id] = c
 	return nil
 }

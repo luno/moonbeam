@@ -146,6 +146,8 @@ func create(args []string) error {
 	}
 
 	fmt.Printf("Funding address: %s\n", addr)
+	fmt.Printf("Fee: %d\n", s.State.Fee)
+	fmt.Printf("Timeout: %d\n", s.State.Timeout)
 
 	id := strconv.Itoa(n)
 	globalState.Channels[id] = Channel{
@@ -197,6 +199,9 @@ func fund(args []string) error {
 		return err
 	}
 
+	if err := storeAuthToken(id, resp.AuthToken); err != nil {
+		return err
+	}
 	return storeChannel(id, sender.State)
 }
 
@@ -254,7 +259,7 @@ func send(args []string) error {
 		Vout:    ch.State.FundingVout,
 		Payment: payment,
 	}
-	resp, err := c.Validate(req)
+	resp, err := c.Validate(req, ch.AuthToken)
 	if err != nil {
 		return err
 	}
@@ -293,7 +298,6 @@ func flush(id string) error {
 	if err != nil {
 		return err
 	}
-	//sendReq.ID = ch.RemoteID
 
 	// Either the payment has been sent or it hasn't. Find out which one.
 
@@ -305,7 +309,7 @@ func flush(id string) error {
 		TxID: ch.State.FundingTxID,
 		Vout: ch.State.FundingVout,
 	}
-	resp, err := c.Status(req)
+	resp, err := c.Status(req, ch.AuthToken)
 	if err != nil {
 		return err
 	}
@@ -315,7 +319,7 @@ func flush(id string) error {
 	if serverBal == sender.State.Balance {
 		// Pending payment doesn't reflect yet. We have to retry.
 
-		if _, err := c.Send(*sendReq); err != nil {
+		if _, err := c.Send(*sendReq, ch.AuthToken); err != nil {
 			return err
 		}
 
@@ -346,7 +350,7 @@ func flushAction(args []string) error {
 func closeAction(args []string) error {
 	id := args[0]
 
-	_, sender, err := getChannel(id)
+	ch, sender, err := getChannel(id)
 	if err != nil {
 		return err
 	}
@@ -360,7 +364,7 @@ func closeAction(args []string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := c.Close(*req)
+	resp, err := c.Close(*req, ch.AuthToken)
 	if err != nil {
 		return err
 	}
@@ -394,7 +398,7 @@ func status(args []string) error {
 		TxID: ch.State.FundingTxID,
 		Vout: ch.State.FundingVout,
 	}
-	resp, err := c.Status(req)
+	resp, err := c.Status(req, ch.AuthToken)
 	if err != nil {
 		return err
 	}
