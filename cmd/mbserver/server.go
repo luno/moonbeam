@@ -107,7 +107,6 @@ func main() {
 	ss := &ServerState{bc, s}
 
 	http.HandleFunc("/", wrap(ss, indexHandler))
-	http.HandleFunc("/channels", wrap(ss, channelsHandler))
 	http.HandleFunc("/details", wrap(ss, detailsHandler))
 	http.HandleFunc("/close", wrap(ss, closeHandler))
 

@@ -22,10 +22,10 @@ func render(t *template.Template, w http.ResponseWriter, data interface{}) {
 	}
 }
 
-var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
+const header = `<!DOCTYPE html>
 <html>
 <head>
-<title>Moonchan</title>
+<title>Moonbeam</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
@@ -33,45 +33,31 @@ var indexT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div class="container">
+<div class="container">`
 
-<h1>Moonchan</h1>
-
-<ul>
-<li><a href="/channels">Channels</a></li>
-</ul>
-
+const footer = `
 </div>
 </body>
-</html>`))
+</html>`
 
-func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
+var indexT = template.Must(template.New("index").Parse(header + `
+<h1>Moonbeam</h1>
 
-	c := struct {
-	}{}
-	render(indexT, w, c)
-}
+<p>Moonbeam is a protocol built on top of Bitcoin that allows for instant
+off-chain payments between untrusted parties using payment channels.</p>
 
-var channelsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
-<html>
-<head>
-<title>Moonchan</title>
-<meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-<style>
-</style>
-</head>
-<body>
-<div class="container">
+<p>This is a demo server running on testnet.</p>
 
-<h1>Moonchan</h1>
+<h4>More info</h4>
 
-<p><a href="/">Home</a></p>
+<ul>
+<li>Github</li>
+<li>Overview</li>
+<li>Quickstart</li>
+<li>Specification</li>
+</ul>
+
+<h4>Channels</h4>
 
 <table class="table">
 <thead>
@@ -96,9 +82,27 @@ var channelsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 </tbody>
 </table>
 
-</div>
-</body>
-</html>`))
+` + footer))
+
+func indexHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	recs, err := ss.Receiver.List()
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+
+	sort.Sort(chanItems(recs))
+
+	c := struct {
+		ChanItems []storage.Record
+	}{recs}
+	render(indexT, w, c)
+}
 
 type chanItems []storage.Record
 
@@ -112,35 +116,8 @@ func (items chanItems) Swap(i, j int) {
 	items[i], items[j] = items[j], items[i]
 }
 
-func channelsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
-	recs, err := ss.Receiver.List()
-	if err != nil {
-		http.Error(w, "error", http.StatusInternalServerError)
-		return
-	}
-
-	sort.Sort(chanItems(recs))
-
-	c := struct {
-		ChanItems []storage.Record
-	}{recs}
-	render(channelsT, w, c)
-}
-
-var detailsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
-<html>
-<head>
-<title>Moonchan</title>
-<meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-<style>
-</style>
-</head>
-<body>
-<div class="container">
-
-<h1>Channel {{.ID}}</h1>
+var detailsT = template.Must(template.New("index").Parse(header + `
+<h1>Channel details</h1>
 
 <p><a href="/">Home</a></p>
 
@@ -165,9 +142,7 @@ var detailsT = template.Must(template.New("index").Parse(`<!DOCTYPE html>
 None
 {{end}}
 
-</div>
-</body>
-</html>`))
+` + footer))
 
 func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 	txid, vout, ok := splitTxIDVout(r.FormValue("id"))
