@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -57,10 +58,7 @@ func newState(net *chaincfg.Params) (*State, error) {
 }
 
 func getFilename(net *chaincfg.Params) string {
-	if net == &chaincfg.TestNet3Params {
-		return "client-state.testnet3.json"
-	}
-	return "client-state.mainnet.json"
+	return fmt.Sprintf("mbclient-state.%s.json", net.Name)
 }
 
 func save(net *chaincfg.Params, s *State) error {

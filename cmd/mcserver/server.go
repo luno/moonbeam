@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -88,7 +89,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	storage := filesystem.NewFilesystemStorage("server-state.json")
+	path := fmt.Sprintf("mbserver-state.%s.json", net.Name)
+	storage := filesystem.NewFilesystemStorage(path)
 
 	bc, err := bitcoinClient()
 	if err != nil {
