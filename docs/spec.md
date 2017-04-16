@@ -570,6 +570,11 @@ server-side certificate must be validated.
 All values transmitted between the sender and receiver must obviously be
 validated and range checked.
 
+Care must be taken for consistency in the backing database. It's imperative that
+at most one channel can be opened for each (*fundingTxID*, *fundingVout*).
+The sender may attempt to open the same channel twice concurrently.
+The backing database must prevent both from succeeding.
+
 ## Risks
 
 **Cost of capital:**
