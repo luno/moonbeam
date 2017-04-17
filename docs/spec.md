@@ -4,6 +4,51 @@
 
 The Moonbeam system allows for off-chain payments between two untrusted parties using Bitcoin payment channels. The system is suited for use between multi-user platforms such as hosted wallets, exchanges and payment processors. It can be deployed on the Bitcoin network as is today.
 
+## Table of contents
+
+   * [Moonbeam specification](#moonbeam-specification)
+      * [Abstract](#abstract)
+      * [Status](#status)
+      * [Introduction](#introduction)
+      * [Conventions](#conventions)
+      * [Definitions](#definitions)
+      * [Address Format](#address-format)
+      * [Domain Resolution](#domain-resolution)
+      * [Channel parameters and state](#channel-parameters-and-state)
+         * [Parameters](#parameters)
+         * [Channel status](#channel-status)
+         * [Channel setup](#channel-setup)
+         * [Dynamic state](#dynamic-state)
+         * [Constants](#constants)
+      * [Transaction scripts](#transaction-scripts)
+         * [Funding output P2SH public key script](#funding-output-p2sh-public-key-script)
+         * [Closure transaction](#closure-transaction)
+         * [Refund transaction](#refund-transaction)
+      * [Payments](#payments)
+      * [RPC Protocol](#rpc-protocol)
+         * [Channel IDs](#channel-ids)
+         * [Create](#create)
+         * [Open](#open)
+         * [Validate](#validate)
+         * [Send](#send)
+         * [Close](#close)
+         * [Status](#status-1)
+      * [Flows](#flows)
+         * [Initiating a channel](#initiating-a-channel)
+         * [Funding the channel](#funding-the-channel)
+         * [Sending a payment (simplified)](#sending-a-payment-simplified)
+         * [Sending a payment (full)](#sending-a-payment-full)
+            * [Example scenario of an attack where the sender might return misleading errors](#example-scenario-of-an-attack-where-the-sender-might-return-misleading-errors)
+         * [Closure](#closure)
+         * [Blockchain monitoring](#blockchain-monitoring)
+      * [Security considerations](#security-considerations)
+      * [Risks](#risks)
+      * [Recommended parameters](#recommended-parameters)
+         * [Receiver policy parameters](#receiver-policy-parameters)
+      * [Outstanding issues](#outstanding-issues)
+      * [References](#references)
+
+
 ## Status
 
 Draft

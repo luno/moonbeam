@@ -16,7 +16,7 @@ go install moonbeam/cmd/mbserver
 
 The reference client is a standalone command-line program and doesn't require
 direct access to a bitcoin daemon. It stores its state in a file called
-`client-state.{mainnet,testnet3}.json`. This file includes a private key so
+`mbclient-state.{mainnet,testnet3}.json`. This file includes a private key so
 should be kept safe and be backed-up.
 
 
@@ -73,13 +73,12 @@ To get more info about this particular channel, run:
 Now that the channel is open, you can send payments:
 
 ```bash
-./bin/mbclient send test@bitcoinmoonbeam.org 1000
+./bin/mbclient send mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb5Ap5B@bitcoinmoonbeam.org 1000
 ```
 
-This will send 1000 satoshi to test@bitcoinmoonbeam.org.
+This will send 1000 Satoshi to mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb5Ap5B@bitcoinmoonbeam.org.
 
-You can see the payments on the server at:
-https://bitcoinmoonbeam.org/payments
+You can see the payments on the server at: https://bitcoinmoonbeam.org
 
 ### Close the channel
 
@@ -95,7 +94,7 @@ network, but you can broadcast it yourself too.
 ## Server Guide
 
 The reference server requires access to a bitcoin daemon via JSON-RPC.
-It stores its stage in a file called `server-state.json`.
+It stores its stage in a file called `mbserver-state.{mainnet,testnet3}.json`.
 You can configure the server through flags.
 
 To start the server:
