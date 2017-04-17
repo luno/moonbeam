@@ -52,3 +52,9 @@ primarily designed to be imported into larger applications.
 The Moonbeam protocol and reference implementation are still experimental.
 They may still undergo non-backwards compatible changes.
 The reference implementation requires further hardening.
+
+## Contributing
+
+Improvements to the reference implementation, protocol specifications and
+documentation are welcome! Pull requests will undergo review before they can
+be merged.
