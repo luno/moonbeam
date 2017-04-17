@@ -8,7 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
-	"bitbucket.org/bitx/moonchan/models"
+	"github.com/luno/moonbeam/models"
 )
 
 const addr1 = "mrreYyaosje7fxCLi3pzknasHiSfziX9GY"

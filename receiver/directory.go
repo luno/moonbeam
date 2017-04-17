@@ -1,7 +1,7 @@
 package receiver
 
 import (
-	"bitbucket.org/bitx/moonchan/address"
+	"github.com/luno/moonbeam/address"
 )
 
 // Directory provides access to the set of targets.

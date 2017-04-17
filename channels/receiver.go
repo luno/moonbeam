@@ -11,7 +11,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
-	"bitbucket.org/bitx/moonchan/models"
+	"github.com/luno/moonbeam/models"
 )
 
 type ReceiverConfig struct {

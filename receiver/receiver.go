@@ -21,9 +21,9 @@ import (
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil/hdkeychain"
 
-	"bitbucket.org/bitx/moonchan/channels"
-	"bitbucket.org/bitx/moonchan/models"
-	"bitbucket.org/bitx/moonchan/storage"
+	"github.com/luno/moonbeam/channels"
+	"github.com/luno/moonbeam/models"
+	"github.com/luno/moonbeam/storage"
 )
 
 type Receiver struct {

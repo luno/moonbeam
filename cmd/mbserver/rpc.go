@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"bitbucket.org/bitx/moonchan/models"
-	"bitbucket.org/bitx/moonchan/receiver"
+	"github.com/luno/moonbeam/models"
+	"github.com/luno/moonbeam/receiver"
 )
 
 var debugServerRPC = flag.Bool(

@@ -10,7 +10,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 
-	"bitbucket.org/bitx/moonchan/models"
+	"github.com/luno/moonbeam/models"
 )
 
 type SenderConfig struct {

@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"bitbucket.org/bitx/moonchan/channels"
-	"bitbucket.org/bitx/moonchan/models"
-	"bitbucket.org/bitx/moonchan/storage"
+	"github.com/luno/moonbeam/channels"
+	"github.com/luno/moonbeam/models"
+	"github.com/luno/moonbeam/storage"
 )
 
 func (r *Receiver) checkChannel(blockCount int64, rec storage.Record) error {
