@@ -62,7 +62,7 @@ func setUpChannel(t *testing.T, capacity int64) (*Sender, *Receiver) {
 	const (
 		txid        = "5b2c6c349612986a3e012bbc79e5e04d5ba965f0e8f968cf28c91681acbbeb34"
 		vout        = 1
-		pkscriptHex = "fbe9351367de8e1e341ad62312f107b839bddb0a"
+		pkscriptHex = "a914fbe9351367de8e1e341ad62312f107b839bddb0a87"
 	)
 	pkscript, _ := hex.DecodeString(pkscriptHex)
 	txout := wire.NewTxOut(capacity, pkscript)

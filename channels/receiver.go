@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
@@ -187,11 +188,15 @@ func (r *Receiver) Open(txout *wire.TxOut, req *models.OpenRequest) (*models.Ope
 	if err != nil {
 		return nil, err
 	}
-	expected, err := btcutil.NewAddressScriptHash(script, r.net)
+	expectedAddr, err := btcutil.NewAddressScriptHash(script, r.net)
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(txout.PkScript, expected.ScriptAddress()) {
+	expectedPkScript, err := txscript.PayToAddrScript(expectedAddr)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(txout.PkScript, expectedPkScript) {
 		return nil, errors.New("mismatched funding address")
 	}
 
