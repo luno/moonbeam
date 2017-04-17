@@ -103,5 +103,5 @@ payment channel.
 
 ## More information
 
-- [Moonbeam Repository](../)
+- [Moonbeam Repository](https://github.com/luno/moonbeam)
 - [Specification](spec.md)
