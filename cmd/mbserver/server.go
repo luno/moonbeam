@@ -108,7 +108,6 @@ func main() {
 
 	http.HandleFunc("/", wrap(ss, indexHandler))
 	http.HandleFunc("/details", wrap(ss, detailsHandler))
-	http.HandleFunc("/close", wrap(ss, closeHandler))
 
 	if *externalURL != "" {
 		http.HandleFunc(resolver.MoonbeamPath, domainHandler)

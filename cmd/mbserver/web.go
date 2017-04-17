@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -9,7 +8,6 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/luno/moonbeam/models"
 	"github.com/luno/moonbeam/resolver"
 	"github.com/luno/moonbeam/storage"
 )
@@ -125,11 +123,6 @@ var detailsT = template.Must(template.New("index").Parse(header + `
 
 <pre>{{.StateJSON}}</pre>
 
-<form action="/close" method="post">
-<input type="hidden" name="id" value="{{.ID}}">
-<button type="submit">Close Channel</button>
-</form>
-
 <h2>Payments</h2>
 
 {{if .Payments}}
@@ -182,26 +175,6 @@ func detailsHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
 	render(detailsT, w, c)
 }
 
-func closeHandler(ss *ServerState, w http.ResponseWriter, r *http.Request) {
-	txid, vout, ok := splitTxIDVout(r.FormValue("id"))
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-
-	req := models.CloseRequest{
-		TxID: txid,
-		Vout: vout,
-	}
-
-	resp, err := ss.Receiver.Close(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Write([]byte(hex.EncodeToString(resp.CloseTx)))
-}
 func domainHandler(w http.ResponseWriter, r *http.Request) {
 	d := resolver.Domain{
 		Receivers: []resolver.DomainReceiver{
