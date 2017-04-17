@@ -2,14 +2,17 @@
 
 ## Installation
 
+You must first [download and install Go](https://golang.org/dl/) if you don't
+have it already.
+
 ```bash
 git clone git@github.com:luno/moonbeam.git
 cd moonbeam
 source ./vars.sh
 go get github.com/btcsuite/btcutil
 go get github.com/btcsuite/btcrpcclient
-go install moonbeam/cmd/mbclient
-go install moonbeam/cmd/mbserver
+go install github.com/luno/moonbeam/cmd/mbclient
+go install github.com/luno/moonbeam/cmd/mbserver
 ```
 
 ## Client Guide
@@ -40,14 +43,13 @@ To see the channel info, you can run:
 ./bin/mbclient list -a
 ```
 
-To see the channel info on the server, visit
-https://bitcoinmoonbeam.org/channels
+To see the channel info on the server, visit https://bitcoinmoonbeam.org
 
 ### Fund the channel
 
-Now you need to send some coins to the funding address. You can send any amount.
-This amount will be the maximum channel capacity. You can send it from
-any wallet.
+Now you need to send some coins to the funding address. You can send any amount
+larger than the channel fee. This amount will be the maximum channel capacity.
+You can send it from any wallet.
 
 You must wait for the transaction to confirm before proceeding.
 Once the transaction has confirmed run:
@@ -100,7 +102,7 @@ You can configure the server through flags.
 To start the server:
 
 ```bash
-./bin/mbserver
+./bin/mbserver --destination=<refundaddr> --xprivkey=<your_xprivkey> --auth_token=<random_secret>
 ```
 
 You can then view the server status by visting https://127.0.0.1:3211.

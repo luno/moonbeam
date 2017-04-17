@@ -41,8 +41,8 @@ const footer = `
 var indexT = template.Must(template.New("index").Parse(header + `
 <h1>Moonbeam</h1>
 
-<p>Moonbeam is a protocol built on top of Bitcoin that allows for instant
-off-chain payments between untrusted parties using payment channels.</p>
+<p>Moonbeam is a protocol that uses Bitcoin payment channels to facilitate
+instant off-chain payments between multi-user platforms.</p>
 
 <p>This is a demo server running on testnet.</p>
 

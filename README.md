@@ -1,7 +1,9 @@
 # Moonbeam
 
-Moonbeam is a protocol built on top of Bitcoin that allows for instant
-off-chain payments between untrusted parties using payment channels.
+Moonbeam is a protocol that uses Bitcoin payment channels to facilitate instant off-chain payments between multi-user platforms.
+
+Moonbeam doesn't require segwit or larger blocks, and can be deployed on the
+Bitcoin network today.
 
 This repository contains the protocol specification, documentation and
 reference implementation.
@@ -19,9 +21,9 @@ in a decentralized way. An address in Moonbeam looks like this:
 `mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb7vCiK@example.com`
 
 The @example.com piece means that this address is handled by the example.com
-domain. Platforms can use the domain name to automatically open Moonbeam
+domain. Platforms can use these domain names to automatically open Moonbeam
 channels and send payments without any prior arrangements or agreements, as
-long as they both implement the Moonbeam protocol.
+long as they implement the Moonbeam protocol.
 
 Moonbeam is designed to be easily adopted by users. Moonbeam addresses contain
 standard Bitcoin addresses so that they can be trivially used with existing
@@ -31,15 +33,15 @@ selectively per-payment).
 
 ## Documentation
 
-[Overview](docs/overview.md)
+[Overview](docs/overview.md) - High-level overview of the system
 
-[Quickstart](docs/quickstart.md)
+[Quickstart](docs/quickstart.md) - Send your first Moonbeam payment on testnet in minutes
 
-[Specification](docs/spec.md)
+[Specification](docs/spec.md) - The full protocol specification
 
-[Go Package Documentation](https://godoc.org/github.com/luno/moonbeam)
+[Go Package Documentation](https://godoc.org/github.com/luno/moonbeam) - Documentation for the reference implementation packages
 
-Demo server (testnet): https://bitcoinmoonbeam.org
+https://bitcoinmoonbeam.org - Demo server on testnet
 
 ## Reference implementation
 

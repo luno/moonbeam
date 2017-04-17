@@ -2,7 +2,7 @@
 
 ## Abstract
 
-The Moonbeam system allows for off-chain payments between two untrusted parties using Bitcoin payment channels. The system is suited for use between multi-user platforms such as hosted wallets, exchanges and payment processors. It can be deployed on the Bitcoin network as is today.
+Moonbeam is a protocol that uses Bitcoin payment channels to facilitate instant off-chain payments between multi-user platforms such as hosted wallets, exchanges and payment processors. It doesn't require segwit or larger blocks, and can be deployed on the Bitcoin network today.
 
 ## Table of contents
 
@@ -56,10 +56,16 @@ Draft
 ## Introduction
 
 Moonbeam builds on the concept of payment channels in Bitcoin.
-It describes a system whereby clients can initiate payment channels to send
+It defines a system whereby clients can initiate payment channels to send
 payments to servers. The server in this context would usually be a multi-user
 platform so that the channel can be used to send payments to any of the users
 on the platform.
+
+The sender and receiver platforms generally do not need to trust each other.
+Users of a platform (e.g. a hosted wallet's customers) trust the platform.
+However, the platform cannot trust its users. For example, a user on the
+receiving platform might collude with the operators of the sending platform,
+or with a user of the sending platform.
 
 ## Conventions
 
@@ -77,7 +83,7 @@ JSON format when used in the protocol.
   <dd>The party receiving Bitcoin from the sender.</dd>
 </dl>
 
-## Address Format
+## Address format
 
 Moonbeam addresses have the following format:
 
@@ -88,20 +94,18 @@ Moonbeam addresses have the following format:
 **version** consists of 1 character  
 **checksum** consists of 5 characters
 
-The version and checksum characters are computed using the base58 encoding scheme used for standard Bitcoin addresses. First the string is rearranged to `<address>+mb@<domain>` and interpreted as a byte array. Next this byte array is encoded according to the base58 algorithm with version=0x01. The first character becomes version and the last 4 characters becomes checksum.
-
-Future versions of Moonbeam may use larger version numbers.
+The version and checksum characters are computed using the base58 encoding scheme used for standard Bitcoin addresses. First the string is rearranged to `<address>+mb@<domain>` and interpreted as a byte array. Next this byte array is encoded according to the base58 algorithm with version=0x01. The first character becomes version and the last 4 characters becomes checksum. Future versions of Moonbeam may use a different version byte.
 
 Example:
 `mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb7vCiK@example.com`
 
-## Domain Resolution
+## Domain resolution
 
 In order to send a payment to “mgzdqkEjYEjR5QNdJxYFnCKZHuNYa5bUZ2+mb7vCiK@example.com”, the sender must open a channel to example.com. The domain resolution procedure describes how to resolve “example.com” to a suitable endpoint for the RPC protocol.
 
-If domain accepts Moonbeam payments, then the URL `https://<domain>/moonbeam.json` will contain a JSON document pointing to the Moonbeam RPC endpoints for the domain.
+If *domain* accepts Moonbeam payments, then the URL `https://<domain>/moonbeam.json` will contain a JSON document pointing to the Moonbeam RPC endpoints for the domain.
 
-This URL should be fetched over HTTPS, ensuring that the remote server certificate is validated. The server may return one or more 301 or 302 redirects which must be followed. (For example, `https://example.com/moonbeam.json` -> `https://www.example.com/moonbeam.json`.)
+This URL should be fetched over HTTPS, ensuring that the remote server certificate is validated. The server may return one or more 301 or 302 redirects which must be followed. (For example, `https://example.com/moonbeam.json` → `https://www.example.com/moonbeam.json`.)
 
 The `moonbeam.json` document has this structure:
 
@@ -173,27 +177,27 @@ These values are shared between the sender and receiver.
 Sender and receiver public keys:
 <dl>
   <dt>senderPubKey</dt>
-  <dd>sender's public key</dd>
+  <dd>Sender's public key in compressed format</dd>
   <dt>receiverPubKey</dt>
-  <dd>receiver's public key</dd>
+  <dd>Receiver's public key in compressed format</dd>
 </dl>
 
 Output addresses:
 <dl>
   <dt>senderOutput</dt>
-  <dd>address to which the sender’s change will be sent</dd>
+  <dd>Address to which the sender’s change will be sent</dd>
   <dt>receiverOutput</dt>
-  <dd>address to which the receiver’s balance will be sent</dd>
+  <dd>Address to which the receiver’s balance will be sent</dd>
 </dl>
 
 Funding transaction output details:
 <dl>
   <dt>fundingTxID</dt>
-  <dd>transaction ID of the confirmed funding transaction</dd>
+  <dd>Transaction ID of the confirmed funding transaction</dd>
   <dt>fundingVout</dt>
-  <dd>index of the confirmed funding transaction output</dd>
+  <dd>Index of the confirmed funding transaction output</dd>
   <dt>capacity</dt>
-  <dd>integer number of Satoshi equal to the value of the funding transaction output</dd>
+  <dd>Integer number of Satoshi equal to the value of the funding transaction output</dd>
 </dl>
 
 ### Dynamic state
@@ -202,11 +206,11 @@ These values are updated as payments are sent through the channel.
 
 <dl>
   <dt>balance</dt>
-  <dd>integer number of Satoshi assigned from the sender to the receiver, initially 0</dd>
+  <dd>Integer number of Satoshi assigned from the sender to the receiver, initially 0</dd>
   <dt>paymentsHash</dt>
-  <dd>a hash of the details of all the payments that make up the balance, initially 32 zero bytes</dd>
+  <dd>A SHA-256 hash of the details of all the payments that make up the balance, initially 32 zero bytes</dd>
   <dt>senderSig</dt>
-  <dd>sender’s signature for the closure transaction</dd>
+  <dd>Sender’s signature for the closure transaction</dd>
 </dl>
 
 ### Constants
@@ -215,9 +219,9 @@ The values defined as constants. They can't be varied per channel.
 
 <dl>
   <dt>protocolVersion = 1</dt>
-  <dd>the protocol version</dd>
+  <dd>The protocol version</dd>
   <dt>dustThreshold = 546</dt>
-  <dd>minimum number of Satoshis for closure transaction outputs</dd>
+  <dd>Minimum number of Satoshis for closure transaction outputs</dd>
 </dl>
 
 ## Transaction scripts
@@ -314,7 +318,7 @@ If a payment _p_ is accepted by the receiver, the channel dynamic state is updat
 _balance_ ← _balance_ + _p_.Amount  
 _paymentsHash_ ← SHA256(serialize(_p_), _paymentsHash_)
 
-Note that since the serialization of _p_ is not unique, the raw serialized data received from the sender should be used.
+Note that since the serialization of _p_ is not unique, the raw serialized data received from the sender should be used to compute the hash.
 
 Both the sender and receiver should store their entire history of payments in raw serialized form so that it’s possible to recompute the hash. This is useful if there is a dispute. The hashes can be compared to the null data output of the closure transaction to verify which list of payments is correct.
 
@@ -335,7 +339,7 @@ A channel is uniquely identified by its funding outpoint
 
 ### Create
 
-Initiate a channel opening. This creates a channel in the CREATED state.
+Initiate a new channel.
 
 `POST <endpoint>/create`
 
@@ -362,6 +366,9 @@ type CreateResponse struct {
         ReceiverData []byte `json:"receiverData"`
 }
 ```
+
+ReceiverData is an opaque blob of data that the client must store and provide
+again for the Open call.
 
 ### Open
 
@@ -395,9 +402,12 @@ type OpenResponse struct {
 }
 ```
 
+AuthToken is a token that further RPC calls require to authenticate operations
+on the channel.
+
 ### Validate
 
-Validate checks whether a payment would be accepted if it is sent.
+Validate checks whether a payment will be accepted if it is sent.
 
 ```
 PUT <endpoint>/validate/<txid>-<vout>
@@ -547,11 +557,11 @@ The following procedure should be used to send a payment:
         1. Update the local state to include the payment
         2. Exit the loop
 
-After the first Send RPC call, whether it succeeds or not, we are committed to sending the payment. If we are unable to send it successfully, the only other option is the close the channel. This is done to avoid an attack described later. The Validate RPC call is needed to prevent denial of service if one the sender’s users requests a payment to an invalid address.
+After the first Send RPC call, whether it succeeds or not, we are committed to sending the payment. If we are unable to send it successfully, the only other option is the close the channel. This is done to avoid an attack described below. The Validate RPC call is needed to prevent denial of service if one the sender’s users requests a payment to an invalid address.
 
 Since the _senderSig_ encodes the current channel state, it is always safe to retry sending the payment without any risk of a double payment.
 
-If we fail to send a payment and close the channel, after the closure transaction has been mined, we can check whether the payment was in fact accepted or not.
+If we fail to send a payment and close the channel, after the closure transaction has been mined, we can check whether the payment was in fact accepted or not using the *paymentsHash* null data output.
 
 #### Example scenario of an attack where the sender might return misleading errors
 
@@ -569,8 +579,8 @@ If the sender believes the errors returned by the receiver, it will assume (b) w
 
 The attacker empties out account (b) at the sender through other means and publishes the closure transaction for (a, b) to receive a total of 3000, which causes the sender to lose money.
 
-Prevention:
-Close the channel after any failed transaction (after retrying).
+This scenario is prevented by closing the channel after any failed transaction
+(after retrying).
 
 ### Closure
 
@@ -580,7 +590,8 @@ broadcast the latest closure transaction and return the raw transaction.
 The client should broadcast the closure transaction too.
 
 The receiver must not accept any further payments after sharing the closure
-transaction with the sender. Otherwise the sender could publish the transaction.
+transaction with the sender. Otherwise the sender could publish the older
+transaction.
 
 The channel status is now CLOSING. Once the closure transaction is confirmed,
 the channel status becomes CLOSED.
@@ -589,11 +600,14 @@ the channel status becomes CLOSED.
 
 Throughout this flow, the server must monitor the blockchain. If the block
 height gets too close to channel timeout, the server must close the channel
-by broadcasting the closure transaction. Failure to do this early enought risks
-that the client broadcast the refund transaction.
+by broadcasting the closure transaction. Failure to do this early enough risks
+that the client broadcasts the refund transaction.
 
 
 ## Security considerations
+
+The sender and receiver platforms in general do not trust each other.
+They also cannot trust their users. Users, however, must trust their platforms.
 
 The server must never share the signed closure transaction with the receiver
 until the channel is closed. Otherwise, the sender could keep a copy of a
@@ -601,9 +615,10 @@ previous closure transaction and broadcast it.
 
 The server could also broadcast a previous version of the closure transaction.
 This would revoke any payments made after that version. However, it only results
-in less money transferred to the receiver so would generally not be in the
-interest of the receiver to do. If it happens, the sender needs to check the
-closure hash and revoke the unsent payments.
+in less money transferred to the receiver so would usually not be in the
+interest of the receiver to do. If it happens, the sender should check the
+*paymentsHash* output of the closure transaction and refund any unsent payments
+to its users.
 
 The receiver must always check that the signed closure transaction is considered
 "standard" by the bitcoin network mempool rules. Otherwise, it may be unable
@@ -618,13 +633,16 @@ validated and range checked.
 Care must be taken for consistency in the backing database. It's imperative that
 at most one channel can be opened for each (*fundingTxID*, *fundingVout*).
 The sender may attempt to open the same channel twice concurrently.
-The backing database must prevent both from succeeding.
+The backing database must prevent both open attempts from succeeding.
 
 ## Risks
 
+Payment channels have not been deployed widely before and they may entail
+previously unforseen risks.
+
 **Cost of capital:**
 The sender must put up capital in advance for payments that
-it intends to make. There is a cost to this since it becomes inaccessible
+it intends to make. There is a cost to this since the capitcal is inaccessible
 until the channel is closed.
 
 **Refund delay:**
@@ -633,45 +651,50 @@ The sender has to wait for the *timeout* before the refund transaction can be
 broadcast. If the *timeout* is large, this could capture a significant amount
 of capital in limbo which could be disruptive for the sender.
 
-**Block space congestion**
-If the bitcoin network becomes congested, the block space fee rate could rise
-so that the closure transaction fee is too low to be confirmed quickly.
-The closure transaction could be delayed longer than the *timeout* and the
-sender could then broadcast the refund transaction first (with a higher fee).
-To mitigate this, server should close the channel well before the *timeout*.
+**Block space congestion:**
+If the Bitcoin network becomes congested, the block space fee rate could rise
+such that the closure transaction fee is too low for the closure transaction
+to confirm quickly.
+If closure transaction is delayed longer than the *timeout*, the
+sender could then broadcast the refund transaction with a higher fee and it
+may be confirmed first.
+To mitigate this, server should close the channel well before the *timeout*
+and ensure that the *fee* is relatively high.
 
-**Miner collusion**
+**Miner collusion:**
 The sender could bribe miners to exclude the closure transaction and then mine
-the refund transaction after the timeout. This could be bone by specifying a
+the refund transaction after the timeout. This could be done by specifying a
 huge fee in the refund transaction. Currently the mempool rules reject the
 refund transaction before *timeout* has elapsed, but the sender could share it
 directly with miners so that they know to rather skip the closure transaction
 and wait for the big payout.
 
-**Need to monitor blockchain**
+**Need to monitor blockchain:**
 The receive must monitor the blockchain and ensure that it broadcasts the
 closure transaction before the *timeout*. If, for example, the server goes
 offline for an extended period of time, it may miss the window. Therefore, the
 server needs to be reliable and redundant.
 
-**DNS hijacking**
+**DNS hijacking:**
 If the receiver's DNS server is hijacked, an attacker could receive payments
 to new channels that were intended for the real receiver. This is partially
 mitigated by requiring SSL, but if DNS is hijacked, the attacker could quickly
-obtain a valid SSL certificate from Let's Encrypt. A psossible mitigation would
+obtain a valid SSL certificate from Let's Encrypt. A possible mitigation would
 be to require the server to prove ownership of the target address in
 ValidateResponse before sending the payment.
 
-**Risk of the future**
-Payments are sent over the channel in real time but the channel is only
+**Risk of the future:**
+Payments are sent over the channel in real-time but the channel is only
 finalized some time in the future. Any number of events could occur after the
-channel is open that could disrupt the final closure. For example, a blockchain
+channel is opened that could disrupt the final closure.
+For example, a blockchain
 fork could render the closure transaction invalid, or changes to mempool
 acceptance rules could disrupt closure transactions.
 
-**Denial of service**
-The server must expose its endpoint to the public. Therefore, it can be a target
-of DDOS attacks. This may be mitigated by filtering, rate limiting and providing
+**Denial of service:**
+The server must expose its RPC endpoints to the public. Therefore, it can be a
+target of DDOS attacks.
+This may be mitigated by filtering, rate limiting and providing
 multiple endpoints in moonbeam.json.
 
 ## Recommended parameters
@@ -680,14 +703,14 @@ multiple endpoints in moonbeam.json.
 The sender wants a smaller timeout to reduce its risk of stuck capital if the
 receiver disappears. The receiver wants a larger timeout to ensure it has
 sufficient time for the closure transaction to confirm.
-We recommend a *timeout* of 7 days and for the receiver to close the channel
+We suggest a *timeout* of 7 days and for the receiver to close the channel
 after 24 hours. This provides sufficient time for the receiver to recover from
 server outages and some time for network fees to correct after any short-term
 transaction backlog.
 
 **fee:**
 The fee should be chosen to be higher than a typical network fee because of the
-importance of the closure transaction. We recommend choosing the fee rate to be
+importance of the closure transaction. We suggest choosing the fee rate to be
 50% higher than the fee rate that would be used for normal payments.
 
 
@@ -699,25 +722,24 @@ e.g. to avoid using more capital than necessary.
 
 <dl>
   <dt>softTimeout</dt>
-  <dd>block count after which the receiver will close the channel</dd>
+  <dd>Block count after which the receiver will close the channel</dd>
   <dt>paymentsMaxCount</dt>
-  <dd>maximum number of payments before the receiver will close the channel</dd>
+  <dd>Maximum number of payments before the receiver will close the channel</dd>
   <dt>balanceMax</td>
-  <dd>maximum balance after which the receiver will close the channel</dd>
+  <dd>Maximum balance after which the receiver will close the channel</dd>
   <dt>fundingMinConf</dt>
-  <dd>minimum number of confirmations that the receiver will accept for the funding transaction</dd>
+  <dd>Minimum number of confirmations that the receiver will accept for the funding transaction</dd>
   <dt>paymentMinAmount</dt>
-  <dd>minimum transaction amount that the receiver will accept</dd>
+  <dd>Minimum transaction amount that the receiver will accept</dd>
   <dt>paymentMaxAmount</dt>
-  <dd>Maximum transaction amount that the receiver will accept. zero means there is no maximum.</dd>
+  <dd>Maximum transaction amount that the receiver will accept. Zero means there is no maximum.</dd>
 </dl>
 
 ## Outstanding issues
 
-- Min amount is the dust threshold, but receiver doesn’t want channels closed at dust threshold because it costs more to spend than it’s worth.
-- Sender must certify the channel (txid, vout) to prove that channel was accepted by the domain
-- Validate should prove ownership of address by signing a message to avoid domain takeover attacks
-
+- Currently the minimum transaction amount is *dustThreshold*, but the receiver wouldn't want the channel to be closed with *balance* = *dustThreshold* because it costs more to spend the output than it's worth.
+- Proof of payment: The sender should certify the channel (txid, vout) by signing a message with its x509 TLS certificate to prove that channel was accepted by the domain.
+- Mitigate domain hijacking and proof of payment: The Validate RPC should prove ownership of the target address by signing a message to prevent payments being sent to the attackers.
 
 ## References
 
