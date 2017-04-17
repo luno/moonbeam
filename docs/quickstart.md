@@ -3,13 +3,13 @@
 ## Installation
 
 ```bash
-git clone git@bitbucket.org:bitx/moonchan.git
-cd moonchan
+git clone git@github.com:luno/moonbeam.git
+cd moonbeam
 source ./vars.sh
 go get github.com/btcsuite/btcutil
 go get github.com/btcsuite/btcrpcclient
-go install moonchan/cmd/mcclient
-go install moonchan/cmd/mcserver
+go install moonbeam/cmd/mbclient
+go install moonbeam/cmd/mbserver
 ```
 
 ## Client Guide
@@ -26,7 +26,7 @@ First we need to initiate a channel opening to a remote server. In this case,
 https://bitcoinmoonbeam.org:
 
 ```bash
-./bin/mcclient create bitcoinmoonbeam.org <refundaddr>
+./bin/mbclient create bitcoinmoonbeam.org <refundaddr>
 ```
 
 `refundaddr` is your own wallet address where the balance of coins will be
@@ -37,7 +37,7 @@ The funding address and channel ID are printed if successful.
 To see the channel info, you can run:
 
 ```bash
-./bin/mcclient list -a
+./bin/mbclient list -a
 ```
 
 To see the channel info on the server, visit
@@ -53,19 +53,19 @@ You must wait for the transaction to confirm before proceeding.
 Once the transaction has confirmed run:
 
 ```bash
-./bin/mcclient fund <id> <txid> <vout> <amount_in_satoshi>
+./bin/mbclient fund <id> <txid> <vout> <amount_in_satoshi>
 ```
 
 If successful, the channel is now open. To see your open channels, run:
 
 ```bash
-./bin/mcclient list
+./bin/mbclient list
 ```
 
 To get more info about this particular channel, run:
 
 ```bash
-./bin/mcclient show <id>
+./bin/mbclient show <id>
 ```
 
 ### Send payments
@@ -73,7 +73,7 @@ To get more info about this particular channel, run:
 Now that the channel is open, you can send payments:
 
 ```bash
-./bin/mcclient send test@bitcoinmoonbeam.org 1000
+./bin/mbclient send test@bitcoinmoonbeam.org 1000
 ```
 
 This will send 1000 satoshi to test@bitcoinmoonbeam.org.
@@ -86,7 +86,7 @@ https://bitcoinmoonbeam.org/payments
 Once you're done, you can close the channel:
 
 ```bash
-./bin/mcclient close <id>
+./bin/mbclient close <id>
 ```
 
 This will print the closure transaction. The server should submit it to the
@@ -101,7 +101,7 @@ You can configure the server through flags.
 To start the server:
 
 ```bash
-./bin/mcserver
+./bin/mbserver
 ```
 
 You can then view the server status by visting https://127.0.0.1:3211.
@@ -111,11 +111,11 @@ in your browser in order to view the page.
 The available configuration flags can be found by running
 
 ```bash
-./bin/mcserver --help
+./bin/mbserver --help
 ```
 
 To create a channel to your test server, run:
 
 ```bash
-./bin/mcclient create https://127.0.0.1:3211/moonbeamrpc <refundaddr>
+./bin/mbclient create https://127.0.0.1:3211/moonbeamrpc <refundaddr>
 ```

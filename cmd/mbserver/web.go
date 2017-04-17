@@ -51,10 +51,10 @@ off-chain payments between untrusted parties using payment channels.</p>
 <h4>More info</h4>
 
 <ul>
-<li>Github</li>
-<li>Overview</li>
-<li>Quickstart</li>
-<li>Specification</li>
+<li><a href="https://github.com/luno/moonbeam">Github</a></li>
+<li><a href="https://github.com/luno/moonbeam/blob/master/docs/overview.md">Overview</a></li>
+<li><a href="https://github.com/luno/moonbeam/blob/master/docs/quickstart.md">Quickstart</a></li>
+<li><a href="https://github.com/luno/moonbeam/blob/master/docs/spec.md">Specification</a></li>
 </ul>
 
 <h4>Channels</h4>
