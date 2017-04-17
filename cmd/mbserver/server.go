@@ -18,8 +18,8 @@ import (
 )
 
 var testnet = flag.Bool("testnet", true, "Use testnet")
-var destination = flag.String("destination", "mnRYb3Zpn6CUR9TNDL6GGGNY9jjU1XURD5", "Destination address")
-var xprivkey = flag.String("xprivkey", "tprv8ZgxMBicQKsPe4s4h67jp6E3zhvfLRU6gnfrHRiwdfL3dR6AWJCw8sCiiGDVM4Nvw3muHfsdfbWVZwDi5TdiwiHrfYDXxGrfRFoYtdF2vnb", "Key chain extended private key")
+var destination = flag.String("destination", "", "Destination address")
+var xprivkey = flag.String("xprivkey", "", "Key chain extended private key")
 var bitcoindHost = flag.String("bitcoind_host", "localhost:18332", "")
 var bitcoindUsername = flag.String("bitcoind_username", "username", "")
 var bitcoindPassword = flag.String("bitcoind_password", "password", "")
@@ -28,7 +28,7 @@ var externalURL = flag.String("external_url", "https://example.com:3211", "Exter
 var domain = flag.String("domain", "example.com", "Domain to accept payments for")
 var tlsCert = flag.String("tls_cert", "tls/cert.pem", "TLS certificate")
 var tlsKey = flag.String("tls_key", "tls/key.pem", "TLS key")
-var authToken = flag.String("auth_token", "38a9cba31aed7e655b8d6d7014efc9bbc8ed9a961b708e90dc05e3b70994c5df", "Secret used to issue auth tokens")
+var authToken = flag.String("auth_token", "", "Secret used to issue auth tokens, generate with openssl rand -hex 32")
 
 func getnet() *chaincfg.Params {
 	if *testnet {
@@ -82,6 +82,16 @@ func wrap(s *ServerState, h func(*ServerState, http.ResponseWriter, *http.Reques
 
 func main() {
 	flag.Parse()
+
+	if *destination == "" {
+		log.Fatalf("--destination is required")
+	}
+	if *xprivkey == "" {
+		log.Fatalf("--xprivkey is required")
+	}
+	if *authToken == "" {
+		log.Fatalf("--auth_token is required")
+	}
 
 	net := getnet()
 
