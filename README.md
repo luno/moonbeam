@@ -37,7 +37,7 @@ selectively per-payment).
 
 [Specification](docs/spec.md)
 
-Go Package Documentation
+[Go Package Documentation](https://godoc.org/github.com/luno/moonbeam)
 
 Demo server (testnet): https://bitcoinmoonbeam.org
 
