@@ -1,3 +1,5 @@
 src/
 bin/
 pkg/
+mbclient-state.*.json
+mbserver-state.*.json
