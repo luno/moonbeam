@@ -43,6 +43,8 @@ selectively per-payment).
 
 https://bitcoinmoonbeam.org - Demo server on testnet
 
+[Mailing list](https://groups.google.com/forum/#!forum/bitcoin-moonbeam) - Discussions about Moonbeam
+
 ## Reference implementation
 
 This repository contains a reference client and server implementation written in
