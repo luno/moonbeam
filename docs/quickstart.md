@@ -33,7 +33,8 @@ https://bitcoinmoonbeam.org:
 ```
 
 `refundaddr` is your own wallet address where the balance of coins will be
-sent when the channel is eventually closed.
+sent when the channel is eventually closed. Note that bitcoinmoonbeam.org is
+running on testnet, so this must be a regular Bitcoin testnet address.
 
 The funding address and channel ID are printed if successful.
 
@@ -57,6 +58,11 @@ Once the transaction has confirmed run:
 ```bash
 ./bin/mbclient fund <id> <txid> <vout> <amount_in_satoshi>
 ```
+
+* `id` is the ID of the channel, you can find it by running `bin/mbclient list -a`
+* `txid` is the ID of the funding Bitcoin transaction
+* `vout` denotes the output of the transaction that contains the channel funding address, e.g. `0` for the first output
+* `amount_in_satoshi` is the number of satoshis (1 satoshi = 0.00000001 bitcoin) to send
 
 If successful, the channel is now open. To see your open channels, run:
 
